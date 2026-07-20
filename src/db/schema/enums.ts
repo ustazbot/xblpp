@@ -23,3 +23,41 @@ export const notificationChannelEnum = core.enum("notification_channel", [
   "email",
   "telegram",
 ]);
+
+export const aset = pgSchema("aset");
+
+export const venueTypeEnum = aset.enum("venue_type", ["akademi", "ilk", "plk", "pkm"]);
+export const venueStatusEnum = aset.enum("venue_status", ["aktif", "tutup"]);
+export const facilityTypeEnum = aset.enum("facility_type", [
+  "dewan",
+  "bilik_seminar",
+  "makmal",
+  "asrama",
+  "lain",
+]);
+export const facilityStatusEnum = aset.enum("facility_status", [
+  "aktif",
+  "maintenance",
+  "tutup",
+]);
+
+export const latihan = pgSchema("latihan");
+
+export const deliveryModeEnum = latihan.enum("delivery_mode", [
+  "fizikal",
+  "online_live",
+  "online_rakaman",
+  "hybrid",
+]);
+export const courseStatusEnum = latihan.enum("course_status", [
+  "draft",
+  "published",
+  "ongoing",
+  "completed",
+  "cancelled",
+]);
+export const livePlatformEnum = latihan.enum("live_platform", [
+  "youtube_live",
+  "zoom",
+  "google_meet",
+]);

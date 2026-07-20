@@ -22,6 +22,13 @@
       "when": 1784563562316,
       "tag": "0002_lockout_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784567105468,
+      "tag": "0003_aset_latihan_minimal",
+      "breakpoints": true
     }
   ]
 }
