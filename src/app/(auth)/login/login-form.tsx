@@ -32,8 +32,9 @@ export function LoginForm() {
       return;
     }
 
-    const session = await fetch("/api/auth/session").then((r) => r.json());
-    router.push(session?.user?.forcePasswordChange ? "/reset-password" : "/");
+    // Middleware tentukan destinasi sebenar (force-change / landing dua pintu /
+    // portal ikut role) — cukup pergi ke "/" dan biar ia redirect.
+    router.push("/");
     router.refresh();
   }
 

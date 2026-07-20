@@ -1,16 +1,17 @@
 import { DefaultSession } from "next-auth";
+import type { RoleAssignment } from "@/lib/rbac";
 
 declare module "next-auth" {
   interface User {
     forcePasswordChange: boolean;
-    roles: string[];
+    roles: RoleAssignment[];
   }
 
   interface Session {
     user: {
       id: string;
       forcePasswordChange: boolean;
-      roles: string[];
+      roles: RoleAssignment[];
     } & DefaultSession["user"];
   }
 }
@@ -21,6 +22,6 @@ declare module "@auth/core/jwt" {
   interface JWT {
     id: string;
     forcePasswordChange: boolean;
-    roles: string[];
+    roles: RoleAssignment[];
   }
 }

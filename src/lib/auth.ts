@@ -11,6 +11,7 @@ import {
   nextFailedAttemptState,
   RESET_ATTEMPT_STATE,
 } from "@/lib/auth-rules";
+import { authConfig } from "@/lib/auth.config";
 
 const credentialsSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -30,6 +31,7 @@ class InactiveError extends CredentialsSignin {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       credentials: { email: {}, password: {} },
@@ -69,7 +71,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         await db.update(users).set(RESET_ATTEMPT_STATE).where(eq(users.id, user.id));
 
         const userRoleRows = await db
-          .select({ code: roles.code })
+          .select({
+            code: roles.code,
+            negeriId: userRoles.negeriId,
+            daerahId: userRoles.daerahId,
+            venueId: userRoles.venueId,
+          })
           .from(userRoles)
           .innerJoin(roles, eq(userRoles.roleId, roles.id))
           .where(eq(userRoles.userId, user.id));
@@ -79,42 +86,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.nama,
           forcePasswordChange: user.forcePasswordChange,
-          roles: userRoleRows.map((r) => r.code),
+          roles: userRoleRows,
         };
       },
     }),
   ],
-  session: {
-    strategy: "jwt",
-    // Idle timeout 30 min (PRD Seksyen 11). Diperbaharui bila auth() dipanggil
-    // dalam middleware (Langkah 5) — tiap request aktif lanjutkan expiry.
-    maxAge: 30 * 60,
-  },
-  cookies: {
-    sessionToken: {
-      options: {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
-  pages: { signIn: "/login" },
-  trustHost: true,
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id as string;
-        token.forcePasswordChange = user.forcePasswordChange;
-        token.roles = user.roles;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.forcePasswordChange = token.forcePasswordChange;
-      session.user.roles = token.roles;
-      return session;
-    },
-  },
 });
