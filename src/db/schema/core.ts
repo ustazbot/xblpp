@@ -65,6 +65,10 @@ export const users = core.table("users", {
   isPenceramahLuar: boolean("is_penceramah_luar").notNull().default(false),
   status: userStatusEnum("status").notNull().default("aktif"),
   forcePasswordChange: boolean("force_password_change").notNull().default(true),
+  // Lockout 15 min / 5 percubaan (PRD Seksyen 7) — reset ke 0/null bila login berjaya
+  // atau bila lockedUntil sudah lepas dan percubaan seterusnya gagal semula.
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

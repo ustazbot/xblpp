@@ -15,6 +15,13 @@
       "when": 1784562791899,
       "tag": "0001_v3_1_1_drop_no_pekerja_add_ic_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784563562316,
+      "tag": "0002_lockout_columns",
+      "breakpoints": true
     }
   ]
 }

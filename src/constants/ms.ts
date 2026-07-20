@@ -13,10 +13,25 @@ export const ms = {
   },
   auth: {
     login: "Log Masuk",
-    labelId: "E-mel atau No. Pekerja",
+    labelId: "E-mel",
     labelKataLaluan: "Kata Laluan",
+    labelKataLaluanBaharu: "Kata Laluan Baharu",
+    labelSahkanKataLaluan: "Sahkan Kata Laluan Baharu",
     lupaKataLaluan: "Lupa Kata Laluan?",
     resetKataLaluan: "Set Semula Kata Laluan",
+    resetKataLaluanKeterangan:
+      "Kata laluan anda perlu ditukar sebelum meneruskan.",
+    resetKataLaluanButang: "Kemaskini Kata Laluan",
+    resetKataLaluanBerjaya: "Kata laluan berjaya dikemaskini.",
+    sedangLog: "Sedang log masuk...",
+    ralat: {
+      invalid_credentials: "E-mel atau kata laluan salah.",
+      locked: "Akaun dikunci sementara akibat terlalu banyak percubaan gagal. Sila cuba semula selepas 15 minit.",
+      inactive: "Akaun anda tidak aktif. Hubungi admin.",
+      kataLaluanSemasaSalah: "Kata laluan semasa salah.",
+      kataLaluanTidakSepadan: "Kata laluan baharu tidak sepadan.",
+      kataLaluanTerlaluPendek: "Kata laluan mesti sekurang-kurangnya 10 aksara.",
+    },
   },
   aset: {
     premis: "Premis",
