@@ -25,11 +25,20 @@ export const authConfig = {
   pages: { signIn: "/login" },
   trustHost: true,
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id as string;
         token.forcePasswordChange = user.forcePasswordChange;
         token.roles = user.roles;
+      }
+      // Session JWT tak refresh sendiri bila DB berubah pertengahan sesi
+      // (cth. selepas changePassword() clear forcePasswordChange) — mutation
+      // yang perlu ubah claim session WAJIB panggil updateSession() (auth.ts)
+      // supaya trigger === "update" ni jalan, elak redirect loop force-change.
+      if (trigger === "update" && session?.user) {
+        if (typeof session.user.forcePasswordChange === "boolean") {
+          token.forcePasswordChange = session.user.forcePasswordChange;
+        }
       }
       return token;
     },

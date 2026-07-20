@@ -3,10 +3,11 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { auth, updateSession } from "@/lib/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema/core";
 import { hashPassword, verifyPassword, PASSWORD_MIN_LENGTH } from "@/lib/password";
+import { logAudit } from "@/lib/audit";
 import { ms } from "@/constants/ms";
 
 const changePasswordSchema = z
@@ -57,6 +58,23 @@ export async function changePassword(
     .update(users)
     .set({ passwordHash: newHash, forcePasswordChange: false, updatedAt: new Date() })
     .where(eq(users.id, user.id));
+
+  // Contoh integrasi audit log (Langkah 7) — before/after sengaja TIDAK
+  // sertakan hash password (bukan maklumat berguna untuk audit trail, dan
+  // elak dedah hash walaupun bukan plaintext).
+  await logAudit({
+    userId: user.id,
+    action: "password_change",
+    entityType: "user",
+    entityId: user.id,
+    before: { forcePasswordChange: user.forcePasswordChange },
+    after: { forcePasswordChange: false },
+  });
+
+  // Refresh claim forcePasswordChange dalam JWT session sekarang — tanpa ni
+  // middleware baca token lama (masih true) dan redirect loop balik ke sini
+  // walaupun DB dah betul.
+  await updateSession({ user: { forcePasswordChange: false } });
 
   redirect("/");
 }
