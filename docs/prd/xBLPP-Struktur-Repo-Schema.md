@@ -114,6 +114,22 @@ FK antara schema DIBENARKAN (cth. `latihan.course_sessions.facility_id → aset.
 | `core.audit_logs` | SEMUA mutasi | `id`, `user_id`, `action`, `entity_type`, `entity_id`, `before jsonb`, `after jsonb`, `ip`, `created_at`. **Append-only, tiada UPDATE/DELETE** |
 | `core.import_logs` | Import wizard | `file_name`, `entity`, `total_rows`, `success_rows`, `failed_rows jsonb`, `imported_by` |
 | `core.settings` | Konfigurasi sistem | key-value jsonb, HQ admin sahaja |
+| `core.user_service_records` **(BAHARU — v3.1)** | Data sensitif rekod perkhidmatan, berasingan dari `core.users` sengaja untuk kurangkan blast radius | `id`, `user_id FK UNIQUE → core.users`, `ic_encrypted bytea` (pgcrypto `pgp_sym_encrypt`), `ic_last4 varchar(4)` (untuk paparan masked tanpa decrypt), `updated_at`, `updated_by`. **RBAC: HANYA HQ Admin boleh query/decrypt table ini** — enforce di `lib/rbac.ts`, bukan setakat UI hiding. Setiap decrypt → `core.audit_logs` |
+
+**Nota enkripsi IC:** kunci `pgcrypto` disimpan `/opt/xblpp/secrets/pg_app.env` (sama root-only pattern macam credential DB), BUKAN dalam kod atau `.env` repo. Contoh query:
+
+```sql
+-- Simpan (Langkah 4/7, bila borang rekod perkhidmatan dibina)
+INSERT INTO core.user_service_records (user_id, ic_encrypted, ic_last4)
+VALUES ($1, pgp_sym_encrypt($2, current_setting('app.ic_encryption_key')), right($2, 4));
+
+-- Baca masked (default, semua role yang dibenarkan lihat rekod)
+SELECT ic_last4 FROM core.user_service_records WHERE user_id = $1;
+
+-- Decrypt penuh (HQ Admin sahaja, WAJIB audit log selepas query ni)
+SELECT pgp_sym_decrypt(ic_encrypted, current_setting('app.ic_encryption_key'))
+FROM core.user_service_records WHERE user_id = $1;
+```
 
 **Nota auth:** login query = `WHERE (email = $1 OR no_pekerja = $1) AND deleted_at IS NULL`. Kedua-dua kolum ada UNIQUE index — pastikan format `no_pekerja` tidak boleh menyerupai email (validation semasa daftar).
 
@@ -207,6 +223,7 @@ export const users = core.table("users", {
 - Semua perubahan schema melalui `drizzle-kit generate` → SQL file di `/drizzle` → commit → `drizzle-kit migrate` semasa deploy.
 - TIADA `ALTER TABLE` manual di production.
 - Constraint EXCLUDE (conflict booking) ditulis sebagai custom SQL dalam migration file (Drizzle belum support EXCLUDE secara native — ini pengecualian yang didokumentasi).
+- **`pgcrypto` extension** (untuk enkripsi IC, `core.user_service_records`) diaktifkan dalam migration pertama: `CREATE EXTENSION IF NOT EXISTS pgcrypto;`
 
 ---
 

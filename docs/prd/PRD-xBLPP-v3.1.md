@@ -212,6 +212,7 @@ Peraturan v2.0 kekal KETAT untuk komponen baharu: **tiada Redis, Elasticsearch, 
 | RTO | 1 hari bekerja — restore ke VPS baharu (Contabo/lain) |
 | UPS | **TIDAK diperlukan lagi** (tiada hardware on-premise) — jimat RM250–400 |
 | Snapshot VPS | Guna snapshot Contabo (jika tersedia dalam plan) sebagai lapisan tambahan, BUKAN pengganti pg_dump |
+| **Backup encryption (BAHARU — v3.1)** | `pg_dump` output WAJIB di-encrypt (GPG/age) sebelum upload ke R2 — bukan optional lagi memandangkan `core.user_service_records` (IC) kini disimpan dalam DB. Decryption key simpan berasingan dari R2 credential |
 
 ### 5.6 Domain (v3.1 — DIPUTUSKAN)
 
@@ -290,6 +291,21 @@ Matrix role 7-role v2.0 **kekal sepenuhnya** (rujuk v2.0 Seksyen 8). Penjelasan 
 | Password | argon2id, minimum 10 aksara, lockout 15 min / 5 percubaan, force-change login pertama (kekal v2.0) |
 | Reset password | Via email berdaftar ATAU oleh admin peringkat atasan (kekal — kritikal untuk staf tanpa email aktif) |
 | **Profil pengguna (BAHARU)** | Setiap user ada halaman profil: nama, gambar (avatar — local disk, resize server-side), email, no. telefon, negeri/daerah/bahagian, jawatan. **User boleh edit sendiri**: gambar, email, telefon, password. **HANYA admin boleh edit**: nama, No. Pekerja, role, negeri/daerah, status akaun — elak user uji nasib tukar identiti/akses sendiri. Semua perubahan profil → audit log |
+
+### 7.1 Pengendalian data sensitif — No. Kad Pengenalan (BAHARU — v3.1, OVERRIDE v2.0 Seksyen 6.6)
+
+⚠ **Perubahan governance penting:** PRD v2.0 Seksyen 6.6 arahkan "jangan simpan IC penuh melainkan benar-benar diperlukan." Keperluan rekod perkhidmatan BLPP (Nama penuh, IC, email, jawatan, daerah/negeri — senarai rasmi BLPP) mengesahkan keperluan tersebut. Rule ini kini **override** dengan keperluan perlindungan lebih ketat berikut — bukan dilonggarkan begitu sahaja:
+
+| Keperluan | Spesifikasi |
+|---|---|
+| Penyimpanan | **Field-level encryption** (Postgres `pgcrypto`, `pgp_sym_encrypt`) — bukan plaintext, bukan bergantung pada disk encryption sahaja |
+| Kunci enkripsi | Simpan **luar DB**, di `/opt/xblpp/secrets/` (root-only), berasingan dari credential DB & R2 |
+| Struktur table | **Berasingan** dari `core.users` — table `core.user_service_records` (rujuk skema Seksyen 2.1 dokumen struktur) supaya query harian aplikasi tidak automatik terdedah kepada IC |
+| Paparan UI | Default **masked** (`******1234`, 4 digit terakhir sahaja) untuk semua role. Papar penuh hanya atas tindakan eksplisit ("Lihat penuh") |
+| **Akses lihat IC penuh** | **HQ Admin sahaja.** Semua role lain (Admin Negeri/Daerah, PIC, Trainer, Peserta, Pengarah) hanya nampak versi masked, walaupun untuk staf dalam skop kawalan mereka sendiri |
+| Audit | Setiap **decrypt/lihat penuh** IC direkod dalam `core.audit_logs` (bukan setakat mutasi — READ access pun logged untuk data kategori ini) |
+| Larangan | IC TIDAK BOLEH muncul dalam notification, email, Telegram payload, log aplikasi, atau URL/query string. Rujuk staf guna Nama/No. Pekerja sahaja dalam mesej |
+| Backup | Rujuk Seksyen 5.5 — backup DB wajib encrypted memandangkan table ini wujud |
 
 ---
 
@@ -395,6 +411,23 @@ Kekal dari v2.0 Seksyen 15 dengan pindaan:
 | Latency tambahan | Jika DC Contabo di Eropah: +170–250ms RTT dari MY. NFR <2s P95 masih boleh capai dengan SSR + caching, tetapi elak query berantai (N+1) | ⚠ Sahkan lokasi DC |
 | Concurrent | 200 serentak + queue page | Kekal |
 | Security | Kekal v2.0 + **Postgres localhost-only** + SSH key-only (password auth OFF) + fail2ban + ufw (hanya 80/443/SSH) | Diperketat |
+
+### 11.1 Checklist keselamatan application-layer (BAHARU — v3.1)
+
+Infra layer (firewall, TLS, DB access) disahkan selamat Fasa 0 Langkah 1. Checklist ini WAJIB dipatuhi semasa Langkah 4 (auth) dan seterusnya:
+
+| Kawasan | Keperluan |
+|---|---|
+| Rate limiting login | Caddy-level rate limit TAMBAHAN kepada application-level lockout (5 percubaan/15 min) — elak bypass melalui distributed attempt |
+| Session cookie | `httpOnly`, `secure`, `sameSite=strict` — verify eksplisit dalam config Auth.js, jangan andai default mencukupi |
+| Validation | Zod pada SETIAP endpoint (rule sedia ada v2.0 S.17) — tiada pengecualian walaupun tergesa-gesa |
+| SQL injection | Drizzle ORM parameterized queries sahaja — DILARANG raw string concatenation dalam query |
+| File upload | Validate MIME type + size di **server** (bukan client sahaja), simpan luar web-root, larang extension boleh laku (`.php`, `.sh`, dll) |
+| Security headers | `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security` — konfigurasi di Caddyfile |
+| Dependency scanning | GitHub Dependabot aktif pada repo; `npm audit` semasa CI |
+| CI/CD secrets | GitHub Actions guna **GitHub Secrets** (encrypted) — SSH deploy key WAJIB **scoped** (deploy key khusus repo, bukan SSH key peribadi Bos) |
+| GitHub account | 2FA WAJIB aktif — satu akaun compromised = seluruh codebase + secrets history terdedah |
+| Data sensitif (IC) | Rujuk Seksyen 7.1 — field-level encryption, akses HQ Admin sahaja, audit log setiap read |
 
 ---
 
