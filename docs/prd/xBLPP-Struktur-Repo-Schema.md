@@ -42,7 +42,7 @@ xblpp/
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/
-│   │   │   ├── login/              # Satu borang login (email ATAU No. Pekerja)
+│   │   │   ├── login/              # Satu borang login (email sahaja)
 │   │   │   └── reset-password/
 │   │   ├── (landing)/
 │   │   │   └── page.tsx            # Dua pintu: Aset / Latihan (ikut role) — admin/PIC sahaja
@@ -72,7 +72,7 @@ xblpp/
 │   │       ├── latihan.ts          # courses, registrations, attendance, trainers, quizzes...
 │   │       └── enums.ts            # Semua pgEnum berpusat
 │   ├── lib/
-│   │   ├── auth.ts                 # Auth.js config (Credentials: email/no_pekerja + password)
+│   │   ├── auth.ts                 # Auth.js config (Credentials: email + password)
 │   │   ├── rbac.ts                 # Permission matrix + helper `can(user, action, resource)`
 │   │   ├── audit.ts                # Helper log mutasi (WAJIB setiap mutation)
 │   │   ├── notify.ts               # In-app + email + Telegram (satu interface)
@@ -106,7 +106,7 @@ FK antara schema DIBENARKAN (cth. `latihan.course_sessions.facility_id → aset.
 
 | Table | Fungsi | Kolum penting |
 |---|---|---|
-| `core.users` | Satu table untuk SEMUA (admin BLPP + peserta + penceramah) | `id uuid PK`, `no_pekerja varchar(20) UNIQUE NOT NULL`, `email varchar(255) UNIQUE`, `password_hash`, `nama`, `telefon`, `avatar_path`, `negeri_id`, `daerah_id`, `bahagian`, `jawatan`, `is_penceramah_luar bool default false`, `status enum(aktif/digantung/tidak_aktif)`, `force_password_change bool`, timestamps + soft delete |
+| `core.users` | Satu table untuk SEMUA (admin BLPP + peserta + penceramah) | `id uuid PK`, `email varchar(255) UNIQUE NOT NULL`, `password_hash`, `nama`, `telefon`, `avatar_path`, `negeri_id`, `daerah_id`, `bahagian`, `jawatan`, `is_penceramah_luar bool default false`, `status enum(aktif/digantung/tidak_aktif)`, `force_password_change bool`, timestamps + soft delete. ⚠ **v3.1.1: `no_pekerja` DIGUGURKAN** — semua kategori user tiada No. Pekerja rasmi, email jadi satu-satunya login identifier |
 | `core.roles` | Definisi 7 role (PRD v2.0 S.8) | `id`, `code enum(hq_admin/admin_negeri/admin_daerah/pic_premis/penceramah/peserta/pengarah)`, `nama` |
 | `core.user_roles` | Many-to-many + skop | `user_id FK`, `role_id FK`, `negeri_id NULL`, `daerah_id NULL`, `venue_id NULL` (skop PIC) |
 | `core.negeri` / `core.daerah` | Lookup lokasi | Seed dari senarai rasmi |
@@ -114,24 +114,34 @@ FK antara schema DIBENARKAN (cth. `latihan.course_sessions.facility_id → aset.
 | `core.audit_logs` | SEMUA mutasi | `id`, `user_id`, `action`, `entity_type`, `entity_id`, `before jsonb`, `after jsonb`, `ip`, `created_at`. **Append-only, tiada UPDATE/DELETE** |
 | `core.import_logs` | Import wizard | `file_name`, `entity`, `total_rows`, `success_rows`, `failed_rows jsonb`, `imported_by` |
 | `core.settings` | Konfigurasi sistem | key-value jsonb, HQ admin sahaja |
-| `core.user_service_records` **(BAHARU — v3.1)** | Data sensitif rekod perkhidmatan, berasingan dari `core.users` sengaja untuk kurangkan blast radius | `id`, `user_id FK UNIQUE → core.users`, `ic_encrypted bytea` (pgcrypto `pgp_sym_encrypt`), `ic_last4 varchar(4)` (untuk paparan masked tanpa decrypt), `updated_at`, `updated_by`. **RBAC: HANYA HQ Admin boleh query/decrypt table ini** — enforce di `lib/rbac.ts`, bukan setakat UI hiding. Setiap decrypt → `core.audit_logs` |
+| `core.user_service_records` **(v3.1.1)** | Data sensitif rekod perkhidmatan + **pengecam rasmi rekod latihan/sijil** (gantikan No. Pekerja yang digugurkan) | `id`, `user_id FK UNIQUE → core.users`, `ic_encrypted bytea` (pgcrypto `pgp_sym_encrypt`), `ic_hash varchar(64) UNIQUE NOT NULL` (SHA-256 deterministic — untuk dedup/lookup TANPA decrypt, sebab `pgp_sym_encrypt` non-deterministic dan tak boleh UNIQUE terus), `ic_last4 varchar(4)` (paparan masked), `updated_at`, `updated_by`. **RBAC: lihat penuh (interaktif) HANYA HQ Admin; decrypt oleh proses sistem (penjanaan sijil) dibenarkan tapi WAJIB audit log**
 
 **Nota enkripsi IC:** kunci `pgcrypto` disimpan `/opt/xblpp/secrets/pg_app.env` (sama root-only pattern macam credential DB), BUKAN dalam kod atau `.env` repo. Contoh query:
 
 ```sql
+-- Semak duplikat dulu (SEBELUM insert — guna hash, bukan decrypt)
+SELECT id FROM core.user_service_records WHERE ic_hash = encode(digest($2, 'sha256'), 'hex');
+
 -- Simpan (Langkah 4/7, bila borang rekod perkhidmatan dibina)
-INSERT INTO core.user_service_records (user_id, ic_encrypted, ic_last4)
-VALUES ($1, pgp_sym_encrypt($2, current_setting('app.ic_encryption_key')), right($2, 4));
+INSERT INTO core.user_service_records (user_id, ic_encrypted, ic_hash, ic_last4)
+VALUES (
+  $1,
+  pgp_sym_encrypt($2, current_setting('app.ic_encryption_key')),
+  encode(digest($2, 'sha256'), 'hex'),
+  right($2, 4)
+);
 
 -- Baca masked (default, semua role yang dibenarkan lihat rekod)
 SELECT ic_last4 FROM core.user_service_records WHERE user_id = $1;
 
--- Decrypt penuh (HQ Admin sahaja, WAJIB audit log selepas query ni)
+-- Decrypt penuh (HQ Admin interaktif ATAU proses sistem penjanaan sijil — WAJIB audit log selepas)
 SELECT pgp_sym_decrypt(ic_encrypted, current_setting('app.ic_encryption_key'))
 FROM core.user_service_records WHERE user_id = $1;
 ```
 
-**Nota auth:** login query = `WHERE (email = $1 OR no_pekerja = $1) AND deleted_at IS NULL`. Kedua-dua kolum ada UNIQUE index — pastikan format `no_pekerja` tidak boleh menyerupai email (validation semasa daftar).
+**Nota `digest()`:** fungsi ni dari extension `pgcrypto` yang sama (`digest(data, 'sha256')`) — tiada extension tambahan diperlukan.
+
+**Nota auth:** login query = `WHERE email = $1 AND deleted_at IS NULL`. `email` UNIQUE NOT NULL.
 
 ### 2.2 `aset` — Sistem 1
 
@@ -197,8 +207,7 @@ export const core = pgSchema("core");
 
 export const users = core.table("users", {
   id: uuid("id").primaryKey().default(sql`uuidv7()`),   // PG18 native; jika PG16, guna extension pg_uuidv7 atau jana di aplikasi
-  noPekerja: varchar("no_pekerja", { length: 20 }).notNull().unique(),
-  email: varchar("email", { length: 255 }).unique(),
+  email: varchar("email", { length: 255 }).notNull().unique(),  // v3.1.1: satu-satunya login identifier
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   nama: varchar("nama", { length: 150 }).notNull(),
   telefon: varchar("telefon", { length: 20 }),
@@ -270,7 +279,22 @@ Rollback: `git checkout <tag sebelumnya>` + build semula. Migration yang merosak
 1. Provision atas VPS sedia ada: user sistem `xblpp`, direktori `/var/xblpp`, DB `xblpp_prod` + `xblpp_staging`, Nginx vhost, ufw semak (80/443/SSH sahaja), fail2ban.
 2. Skeleton Next.js 14 + TypeScript strict + Tailwind + shadcn/ui + Drizzle mengikut struktur Seksyen 1.
 3. Schema `core` penuh + migration pertama + seed `negeri`/`daerah`/`roles`.
-4. Auth.js Credentials (email ATAU no_pekerja) + argon2id + lockout + force-change + session 30 min idle.
+4. Auth.js Credentials (email + password) + argon2id + lockout + force-change + session 30 min idle.
+
+**⚠ Migration tambahan WAJIB SEBELUM Langkah 4 (v3.1.1 — schema fix):**
+
+Langkah 3 sudah *applied* ke `xblpp_prod` + `xblpp_staging` dengan `core.users.no_pekerja UNIQUE NOT NULL`. Sebab tiada data user sebenar lagi (baru seed rujukan: 7 roles, 16 negeri, 128 daerah — bukan rekod user), migration pembetulan **selamat** dijalankan sekarang:
+
+```sql
+-- Migration 0001_drop_no_pekerja.sql (generate via drizzle-kit selepas kemaskini schema/core.ts)
+ALTER TABLE core.users DROP COLUMN no_pekerja;
+ALTER TABLE core.users ALTER COLUMN email SET NOT NULL;
+
+-- Tambah ic_hash pada core.user_service_records (jika Langkah 3 belum ada kolum ni)
+ALTER TABLE core.user_service_records ADD COLUMN ic_hash varchar(64) UNIQUE NOT NULL;
+```
+
+Jalankan `drizzle-kit generate` (bukan tulis SQL manual terus ke prod) supaya migration file tersimpan dalam `/drizzle` dan konsisten dengan rule "tiada ALTER TABLE manual." Apply ke staging dulu, sahkan idempotency re-run macam Langkah 3, baru apply prod.
 5. RBAC lib + middleware + landing dua pintu (role-based redirect).
 6. Notification lib (in-app + email + Telegram) — interface dulu, channel email/Telegram boleh stub.
 7. Audit log helper + integrasi contoh pada 1 mutation.

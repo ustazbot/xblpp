@@ -258,7 +258,7 @@ Semua kekal dari v2.0 KECUALI baris bertanda 🔄:
 | UI | Tailwind CSS + shadcn/ui | Kekal |
 | Database | PostgreSQL 16 (+ pgvector Fasa 3) | Kekal |
 | ORM | Drizzle ORM | Kekal |
-| Auth | Auth.js (NextAuth v5), Credentials (No. Pekerja + password), **satu session untuk dua sistem** | 🔄 Diperjelas SSO |
+| Auth | Auth.js (NextAuth v5), Credentials (email + password), **satu session untuk dua sistem** | 🔄 Diperjelas SSO |
 | File storage | Local disk (<10MB) + Cloudflare R2 (besar) | Kekal |
 | **Video latihan** | **YouTube (unlisted) — embed IFrame** | 🔄 BAHARU (ganti R2 video) |
 | **Live session** | **YouTube Live** (webinar besar) / **Zoom / Google Meet** (bengkel interaktif — ikut keputusan pengurusan program) | 🔄 BAHARU |
@@ -281,31 +281,35 @@ Matrix role 7-role v2.0 **kekal sepenuhnya** (rujuk v2.0 Seksyen 8). Penjelasan 
 - **Audiens/pengguna akhir = kakitangan KEMAS** (peserta, ±15,000 potensi) + tenaga penceramah (dalaman & luar, flag `penceramah_luar`).
 - Satu akaun = akses kedua-dua sistem mengikut role.
 
-### Autentikasi (v3.1 — DIKEMAS KINI atas arahan)
+### Autentikasi (v3.1.1 — DIKEMAS KINI: email sahaja)
 
-| Item | Keputusan v3.1 |
+⚠ **Perubahan dari draf awal:** semua kategori user (admin BLPP + audience) **tiada No. Pekerja rasmi** — dual-identifier login yang dirancang sebelum ini digugurkan.
+
+| Item | Keputusan v3.1.1 |
 |---|---|
-| ID login utama | **Email** (satu field login) |
-| ID login fallback | **No. Pekerja KEMAS** — field login sama menerima kedua-duanya (sistem detect format). *Rasional: keputusan v2.0 mencatatkan "bukan semua staf guna email rasmi secara aktif" — dengan 15,000 pengguna termasuk kakitangan lapangan luar bandar, email-only berisiko menyekat onboarding sebahagian staf. Kos implement dual-identifier hampir sifar (dua kolum unique, satu query OR)* |
-| Rekod No. Pekerja | Kekal WAJIB dalam profil (unique) — pengecam rasmi untuk rekod latihan & sijil, walaupun bukan ID login utama |
-| Password | argon2id, minimum 10 aksara, lockout 15 min / 5 percubaan, force-change login pertama (kekal v2.0) |
-| Reset password | Via email berdaftar ATAU oleh admin peringkat atasan (kekal — kritikal untuk staf tanpa email aktif) |
-| **Profil pengguna (BAHARU)** | Setiap user ada halaman profil: nama, gambar (avatar — local disk, resize server-side), email, no. telefon, negeri/daerah/bahagian, jawatan. **User boleh edit sendiri**: gambar, email, telefon, password. **HANYA admin boleh edit**: nama, No. Pekerja, role, negeri/daerah, status akaun — elak user uji nasib tukar identiti/akses sendiri. Semua perubahan profil → audit log |
+| ID login | **Email sahaja** — satu field, satu kolum unique. Tiada fallback No. Pekerja |
+| Password | argon2id, minimum 10 aksara, lockout 15 min / 5 percubaan, force-change login pertama (kekal) |
+| Reset password | Via email berdaftar ATAU oleh admin peringkat atasan (kekal) |
+| **Pengecam rasmi rekod latihan & sijil** | **IC** (dari `core.user_service_records`, rujuk Seksyen 7.1) — gantikan peranan No. Pekerja sepenuhnya |
+| **Profil pengguna** | nama, gambar (avatar), email, no. telefon, negeri/daerah/bahagian, jawatan. **User edit sendiri**: gambar, email, telefon, password. **HANYA admin edit**: nama, role, negeri/daerah, status akaun. Semua perubahan → audit log |
 
-### 7.1 Pengendalian data sensitif — No. Kad Pengenalan (BAHARU — v3.1, OVERRIDE v2.0 Seksyen 6.6)
+### 7.1 Pengendalian data sensitif — No. Kad Pengenalan (v3.1.1, OVERRIDE v2.0 Seksyen 6.6)
 
-⚠ **Perubahan governance penting:** PRD v2.0 Seksyen 6.6 arahkan "jangan simpan IC penuh melainkan benar-benar diperlukan." Keperluan rekod perkhidmatan BLPP (Nama penuh, IC, email, jawatan, daerah/negeri — senarai rasmi BLPP) mengesahkan keperluan tersebut. Rule ini kini **override** dengan keperluan perlindungan lebih ketat berikut — bukan dilonggarkan begitu sahaja:
+⚠ **Perubahan governance penting:** PRD v2.0 Seksyen 6.6 arahkan "jangan simpan IC penuh melainkan benar-benar diperlukan." Keperluan rekod perkhidmatan BLPP mengesahkan keperluan tersebut. **Dengan No. Pekerja digugurkan sepenuhnya (semua user tiada No. Pekerja rasmi), IC kini memikul dua peranan:** (1) rekod perkhidmatan rasmi, (2) **pengecam unik rasmi untuk rekod latihan & penjanaan sijil** — menggantikan peranan No. Pekerja dalam PRD v2.0/v3.0 asal.
 
 | Keperluan | Spesifikasi |
 |---|---|
-| Penyimpanan | **Field-level encryption** (Postgres `pgcrypto`, `pgp_sym_encrypt`) — bukan plaintext, bukan bergantung pada disk encryption sahaja |
-| Kunci enkripsi | Simpan **luar DB**, di `/opt/xblpp/secrets/` (root-only), berasingan dari credential DB & R2 |
-| Struktur table | **Berasingan** dari `core.users` — table `core.user_service_records` (rujuk skema Seksyen 2.1 dokumen struktur) supaya query harian aplikasi tidak automatik terdedah kepada IC |
-| Paparan UI | Default **masked** (`******1234`, 4 digit terakhir sahaja) untuk semua role. Papar penuh hanya atas tindakan eksplisit ("Lihat penuh") |
-| **Akses lihat IC penuh** | **HQ Admin sahaja.** Semua role lain (Admin Negeri/Daerah, PIC, Trainer, Peserta, Pengarah) hanya nampak versi masked, walaupun untuk staf dalam skop kawalan mereka sendiri |
-| Audit | Setiap **decrypt/lihat penuh** IC direkod dalam `core.audit_logs` (bukan setakat mutasi — READ access pun logged untuk data kategori ini) |
-| Larangan | IC TIDAK BOLEH muncul dalam notification, email, Telegram payload, log aplikasi, atau URL/query string. Rujuk staf guna Nama/No. Pekerja sahaja dalam mesej |
-| Backup | Rujuk Seksyen 5.5 — backup DB wajib encrypted memandangkan table ini wujud |
+| Penyimpanan | **Field-level encryption** (Postgres `pgcrypto`, `pgp_sym_encrypt`) — bukan plaintext |
+| Kunci enkripsi | Simpan **luar DB**, `/opt/xblpp/secrets/` (root-only), berasingan dari credential DB & R2 |
+| Struktur table | **Berasingan** dari `core.users` — `core.user_service_records` (rujuk skema Seksyen 2.1 dokumen struktur) |
+| **Dedup/lookup (BAHARU)** | `pgp_sym_encrypt` bersifat **non-deterministic** (hasil encrypted berbeza setiap kali walaupun IC sama) — TIDAK boleh UNIQUE constraint terus atas `ic_encrypted`. Tambah kolum `ic_hash varchar(64) UNIQUE NOT NULL` (SHA-256 deterministic) khusus untuk semak duplikat/lookup tanpa perlu decrypt |
+| Paparan UI | Default **masked** (`******1234`). Papar penuh hanya atas tindakan eksplisit ("Lihat penuh") |
+| **Akses lihat IC penuh (interaktif/UI)** | **HQ Admin sahaja.** Semua role lain hanya nampak versi masked |
+| **Akses decrypt (proses sistem)** | Fungsi backend penjanaan sijil/dokumen rasmi **DIBENARKAN** decrypt IC secara automatik (bukan tertakluk sekatan role UI di atas — ini proses sistem, bukan tindakan user melihat). Setiap decrypt (interaktif ATAU sistem) tetap **WAJIB audit log** |
+| **Prasyarat sijil (BAHARU — business rule)** | Sijil TIDAK BOLEH dijana jika `core.user_service_records` untuk user berkenaan tiada rekod IC. Sistem papar amaran kepada admin: *"Lengkapkan rekod perkhidmatan (IC) sebelum sijil boleh dijana"* — block, bukan skip |
+| Audit | Setiap decrypt/lihat penuh IC → `core.audit_logs`, termasuk decrypt oleh proses sistem (cth. "sijil dijana untuk user X, IC digunakan") |
+| Larangan | IC TIDAK BOLEH muncul dalam notification, email, Telegram payload, log aplikasi, atau URL/query string |
+| Backup | Rujuk Seksyen 5.5 — backup DB wajib encrypted |
 
 ---
 
@@ -470,7 +474,7 @@ Definisi operasi "lancar" yang boleh diaudit (rujuk metrik G1–G5, Seksyen 3):
 | VPS Contabo down/maintenance | Baharu | Monitoring luaran + RTO 1 hari ke VPS ganti; Contabo track record dari GerakOps |
 | Latency DC Eropah | Baharu | Sahkan lokasi DC; caching agresif; elak N+1 query |
 | Governance domain peribadi | Baharu | Rujuk 5.6 — domain neutral / dokumentasi "sementara" |
-| Governance data di infra bukan rasmi | Kekal | Framing pilot rasmi, tiada IC penuh, No. Pekerja sebagai ID, pelan migrasi didokumentasi, laporan bulanan |
+| Governance data di infra bukan rasmi | Kekal | Framing pilot rasmi, IC encrypted+akses terhad (rujuk S.7.1), email sebagai ID, pelan migrasi didokumentasi, laporan bulanan |
 | Watch-time video tidak boleh dibuktikan | Baharu | Kuiz sebagai completion gate (8.1) — didokumentasi supaya pengurusan faham limitasi |
 | Adoption rendah | Kekal | Seed data sebenar sebelum demo, rollout berperingkat, champion negeri, UI BM penuh |
 | Bus factor = 1 | Kekal | Runbook + README per modul + seed data + dokumentasi deploy |

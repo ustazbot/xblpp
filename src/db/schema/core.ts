@@ -51,8 +51,9 @@ export const users = core.table("users", {
   id: uuid("id")
     .primaryKey()
     .$defaultFn(() => uuidv7()),
-  noPekerja: varchar("no_pekerja", { length: 20 }).notNull().unique(),
-  email: varchar("email", { length: 255 }).unique(),
+  // v3.1.1: no_pekerja digugurkan — semua kategori user tiada No. Pekerja rasmi,
+  // email jadi satu-satunya login identifier.
+  email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   nama: varchar("nama", { length: 150 }).notNull(),
   telefon: varchar("telefon", { length: 20 }),
@@ -73,6 +74,7 @@ export const users = core.table("users", {
 // IC disimpan berasingan dari core.users (bukan lapuk — sengaja kurangkan blast
 // radius). Kunci pgcrypto disimpan /opt/xblpp/secrets/, BUKAN dalam kod/repo.
 // Rujuk PRD v3.1 Seksyen 7.1. Wiring encrypt/decrypt sebenar: Langkah 4/7.
+// v3.1.1: gantikan peranan no_pekerja sebagai pengecam rasmi rekod latihan/sijil.
 export const userServiceRecords = core.table("user_service_records", {
   id: uuid("id")
     .primaryKey()
@@ -82,6 +84,9 @@ export const userServiceRecords = core.table("user_service_records", {
     .unique()
     .references(() => users.id),
   icEncrypted: bytea("ic_encrypted").notNull(),
+  // pgp_sym_encrypt() non-deterministic — tak boleh UNIQUE atas icEncrypted terus.
+  // SHA-256 deterministic untuk dedup/lookup tanpa decrypt (guna digest() dari pgcrypto).
+  icHash: varchar("ic_hash", { length: 64 }).notNull().unique(),
   icLast4: varchar("ic_last4", { length: 4 }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: uuid("updated_by").references(() => users.id),
