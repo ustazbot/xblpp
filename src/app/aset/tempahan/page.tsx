@@ -99,7 +99,11 @@ export default async function TempahanPage() {
                   <td className="p-3">{b.venueNama}</td>
                   <td className="p-3">{b.facilityNama}</td>
                   <td className="p-3">{ms.tempahan.jenisTempahan[b.jenisTempahan]}</td>
-                  <td className="p-3">{b.tujuan}</td>
+                  <td className="p-3">
+                    <Link href={`/aset/tempahan/${b.id}`} className="underline underline-offset-2">
+                      {b.tujuan}
+                    </Link>
+                  </td>
                   <td className="p-3">{dtf.format(b.startTime)}</td>
                   <td className="p-3">{dtf.format(b.endTime)}</td>
                   <td className="p-3">

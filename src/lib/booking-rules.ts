@@ -98,3 +98,21 @@ export function generateRecurringOccurrences(
   }
   return occurrences;
 }
+
+// Langkah 5 — Approval workflow dwi-peringkat (keputusan Langkah 3.5).
+export type ApprovalStage = "pic" | "hq";
+
+// Tentukan peringkat kelulusan SEMASA daripada status booking — null kalau
+// booking bukan dalam status "menunggu kelulusan" (dah diluluskan/ditolak/
+// dibatalkan/perlu_pindah — tiada tindakan lulus/tolak sah pada status ni).
+export function currentApprovalStage(status: string): ApprovalStage | null {
+  if (status === "menunggu_kelulusan_pic") return "pic";
+  if (status === "menunggu_kelulusan_hq") return "hq";
+  return null;
+}
+
+// Status seterusnya bila LULUS pada peringkat semasa — PIC lulus -> giliran
+// HQ; HQ lulus -> diluluskan penuh (tiada peringkat lain).
+export function nextStatusOnApprove(stage: ApprovalStage): "menunggu_kelulusan_hq" | "diluluskan" {
+  return stage === "pic" ? "menunggu_kelulusan_hq" : "diluluskan";
+}

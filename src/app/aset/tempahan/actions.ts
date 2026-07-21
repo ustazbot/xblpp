@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { db } from "@/db";
 import { venueBookings, facilities, venues } from "@/db/schema/aset";
+import { users, roles, userRoles } from "@/db/schema/core";
 import { bookingSchema, recurringBookingSchema, bookingTypeValues } from "@/lib/validators/booking";
 import {
   addBusinessDays,
@@ -14,10 +15,14 @@ import {
   isPastBooking,
   SLA_BUSINESS_DAYS,
   generateRecurringOccurrences,
+  currentApprovalStage,
+  nextStatusOnApprove,
   type BookingOccurrence,
 } from "@/lib/booking-rules";
 import { logAudit } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 import { ms } from "@/constants/ms";
+import { canActOnStage } from "./approval-roles";
 
 export interface ActionState {
   error: string | null;
@@ -41,9 +46,13 @@ const ACTIVE_BOOKING_STATUSES = [
 ] as const;
 
 interface BookingTarget {
+  facilityId: string;
   venueId: string;
   negeriId: string;
   daerahId: string | null;
+  picUserId: string | null;
+  venueNama: string;
+  facilityNama: string;
 }
 
 async function resolveBookingTarget(facilityId: string): Promise<BookingTarget | null> {
@@ -52,12 +61,25 @@ async function resolveBookingTarget(facilityId: string): Promise<BookingTarget |
       venueId: facilities.venueId,
       negeriId: venues.negeriId,
       daerahId: venues.daerahId,
+      picUserId: venues.picUserId,
+      venueNama: venues.nama,
+      facilityNama: facilities.nama,
     })
     .from(facilities)
     .innerJoin(venues, eq(facilities.venueId, venues.id))
     .where(eq(facilities.id, facilityId))
     .limit(1);
-  return target ?? null;
+  return target ? { facilityId, ...target } : null;
+}
+
+async function hqAdminUserIds(): Promise<string[]> {
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(eq(roles.code, "hq_admin"));
+  return rows.map((r) => r.id);
 }
 
 async function hasConflict(facilityId: string, startTime: Date, endTime: Date): Promise<boolean> {
@@ -90,7 +112,7 @@ function isExclusionViolation(err: unknown): boolean {
 }
 
 interface InsertOccurrenceParams {
-  facilityId: string;
+  target: BookingTarget;
   requestedBy: string;
   jenisTempahan: (typeof bookingTypeValues)[number];
   tujuan: string;
@@ -111,17 +133,17 @@ interface InsertOccurrenceParams {
 async function insertOneOccurrence(
   params: InsertOccurrenceParams,
 ): Promise<{ ok: true; id: string } | { ok: false; reason: string }> {
-  const { occurrence, now } = params;
+  const { occurrence, now, target } = params;
 
   if (isPastBooking(occurrence.startTime, now)) {
     return { ok: false, reason: ms.tempahan.ralat.tarikhLampau };
   }
-  if (await hasConflict(params.facilityId, occurrence.startTime, occurrence.endTime)) {
+  if (await hasConflict(target.facilityId, occurrence.startTime, occurrence.endTime)) {
     return { ok: false, reason: ms.tempahan.ralat.konflik };
   }
 
   const values = {
-    facilityId: params.facilityId,
+    facilityId: target.facilityId,
     requestedBy: params.requestedBy,
     jenisTempahan: params.jenisTempahan,
     tujuan: params.tujuan,
@@ -155,6 +177,16 @@ async function insertOneOccurrence(
     before: null,
     after: values,
   });
+
+  if (target.picUserId) {
+    await notify({
+      userId: target.picUserId,
+      title: ms.tempahan.notifikasi.picBaharuTajuk,
+      body: ms.tempahan.notifikasi.picBaharuBadan(target.facilityNama, target.venueNama),
+      link: `/aset/tempahan/${created.id}`,
+      channels: ["in_app", "email"],
+    });
+  }
 
   return { ok: true, id: created.id };
 }
@@ -199,7 +231,7 @@ export async function createBooking(_prevState: ActionState, formData: FormData)
   }
 
   const result = await insertOneOccurrence({
-    facilityId,
+    target,
     requestedBy: session.user.id,
     occurrence: { startTime, endTime },
     recurringGroupId: null,
@@ -272,7 +304,7 @@ export async function createRecurringBooking(
 
   for (const occurrence of occurrences) {
     const result = await insertOneOccurrence({
-      facilityId,
+      target,
       requestedBy: session.user.id,
       occurrence,
       recurringGroupId,
@@ -291,4 +323,220 @@ export async function createRecurringBooking(
     error: null,
     summary: { total: occurrences.length, created, gagal },
   };
+}
+
+interface BookingWithTarget {
+  id: string;
+  status: string;
+  requestedBy: string;
+  tujuan: string;
+  target: BookingTarget;
+}
+
+async function loadBookingWithTarget(bookingId: string): Promise<BookingWithTarget | null> {
+  const [row] = await db
+    .select({
+      id: venueBookings.id,
+      status: venueBookings.status,
+      requestedBy: venueBookings.requestedBy,
+      tujuan: venueBookings.tujuan,
+      facilityId: venueBookings.facilityId,
+      facilityNama: facilities.nama,
+      venueId: venues.id,
+      venueNama: venues.nama,
+      negeriId: venues.negeriId,
+      daerahId: venues.daerahId,
+      picUserId: venues.picUserId,
+    })
+    .from(venueBookings)
+    .innerJoin(facilities, eq(venueBookings.facilityId, facilities.id))
+    .innerJoin(venues, eq(facilities.venueId, venues.id))
+    .where(eq(venueBookings.id, bookingId))
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.id,
+    status: row.status,
+    requestedBy: row.requestedBy,
+    tujuan: row.tujuan,
+    target: {
+      facilityId: row.facilityId,
+      facilityNama: row.facilityNama,
+      venueId: row.venueId,
+      venueNama: row.venueNama,
+      negeriId: row.negeriId,
+      daerahId: row.daerahId,
+      picUserId: row.picUserId,
+    },
+  };
+}
+
+// Tandatangan wajib padan useFormState(prevState, formData) — lulus tak
+// perlukan data borang, jadi kedua-dua parameter tak digunakan.
+export async function approveBooking(
+  bookingId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prevState: ActionState,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _formData: FormData,
+): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const booking = await loadBookingWithTarget(bookingId);
+  if (!booking) {
+    return { error: ms.ralat.umum };
+  }
+  const stage = currentApprovalStage(booking.status);
+  if (!stage) {
+    return { error: ms.tempahan.ralat.statusBukanMenunggu };
+  }
+  if (
+    !canActOnStage(stage, session.user.roles, booking.target.venueId) ||
+    !(await can(session.user, "approve", "booking", {
+      venueId: booking.target.venueId,
+      negeriId: booking.target.negeriId,
+      daerahId: booking.target.daerahId ?? undefined,
+    }))
+  ) {
+    return { error: ms.ralat.tiadaAkses };
+  }
+
+  const now = new Date();
+  const nextStatus = nextStatusOnApprove(stage);
+  const stageColumns =
+    stage === "pic"
+      ? { picApprovedBy: session.user.id, picApprovedAt: now }
+      : { hqApprovedBy: session.user.id, hqApprovedAt: now };
+
+  await db
+    .update(venueBookings)
+    .set({
+      status: nextStatus,
+      ...stageColumns,
+      // Giliran seterusnya dapat SLA 3 hari bekerja SENDIRI (bukan sambung
+      // baki peringkat sebelum) — peringkat diluluskan penuh tak perlu SLA
+      // lagi (terminal, tiada tindakan menunggu).
+      slaDeadline: nextStatus === "diluluskan" ? undefined : addBusinessDays(now, SLA_BUSINESS_DAYS),
+      updatedAt: now,
+    })
+    .where(eq(venueBookings.id, bookingId));
+
+  await logAudit({
+    userId: session.user.id,
+    action: stage === "pic" ? "booking_approve_pic" : "booking_approve_hq",
+    entityType: "venue_booking",
+    entityId: bookingId,
+    before: { status: booking.status },
+    after: { status: nextStatus },
+  });
+
+  if (stage === "pic") {
+    // PIC lulus -> giliran HQ. Maklumkan pemohon (kemajuan) + SEMUA hq_admin
+    // (tindakan diperlukan).
+    await notify({
+      userId: booking.requestedBy,
+      title: ms.tempahan.notifikasi.picLulusTajuk,
+      body: ms.tempahan.notifikasi.picLulusBadan(booking.target.facilityNama),
+      link: `/aset/tempahan/${bookingId}`,
+      channels: ["in_app", "email"],
+    });
+    for (const hqUserId of await hqAdminUserIds()) {
+      await notify({
+        userId: hqUserId,
+        title: ms.tempahan.notifikasi.hqMenungguTajuk,
+        body: ms.tempahan.notifikasi.hqMenungguBadan(booking.target.facilityNama, booking.target.venueNama),
+        link: `/aset/tempahan/${bookingId}`,
+        channels: ["in_app", "email"],
+      });
+    }
+  } else {
+    // HQ lulus -> diluluskan penuh. Maklumkan pemohon + PIC (kalau ada).
+    await notify({
+      userId: booking.requestedBy,
+      title: ms.tempahan.notifikasi.diluluskanTajuk,
+      body: ms.tempahan.notifikasi.diluluskanBadan(booking.target.facilityNama),
+      link: `/aset/tempahan/${bookingId}`,
+      channels: ["in_app", "email"],
+    });
+    if (booking.target.picUserId) {
+      await notify({
+        userId: booking.target.picUserId,
+        title: ms.tempahan.notifikasi.diluluskanTajuk,
+        body: ms.tempahan.notifikasi.diluluskanBadan(booking.target.facilityNama),
+        link: `/aset/tempahan/${bookingId}`,
+        channels: ["in_app"],
+      });
+    }
+  }
+
+  revalidatePath("/aset/tempahan");
+  revalidatePath(`/aset/tempahan/${bookingId}`);
+  redirect(`/aset/tempahan/${bookingId}`);
+}
+
+export async function rejectBooking(
+  bookingId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const rejectionReason = String(formData.get("rejectionReason") ?? "").trim();
+  if (!rejectionReason) {
+    return { error: ms.tempahan.ralat.sebabTolakWajib };
+  }
+
+  const booking = await loadBookingWithTarget(bookingId);
+  if (!booking) {
+    return { error: ms.ralat.umum };
+  }
+  const stage = currentApprovalStage(booking.status);
+  if (!stage) {
+    return { error: ms.tempahan.ralat.statusBukanMenunggu };
+  }
+  if (
+    !canActOnStage(stage, session.user.roles, booking.target.venueId) ||
+    !(await can(session.user, "approve", "booking", {
+      venueId: booking.target.venueId,
+      negeriId: booking.target.negeriId,
+      daerahId: booking.target.daerahId ?? undefined,
+    }))
+  ) {
+    return { error: ms.ralat.tiadaAkses };
+  }
+
+  const now = new Date();
+  await db
+    .update(venueBookings)
+    .set({
+      status: "ditolak",
+      rejectedBy: session.user.id,
+      rejectedAt: now,
+      rejectionReason,
+      updatedAt: now,
+    })
+    .where(eq(venueBookings.id, bookingId));
+
+  await logAudit({
+    userId: session.user.id,
+    action: "booking_reject",
+    entityType: "venue_booking",
+    entityId: bookingId,
+    before: { status: booking.status },
+    after: { status: "ditolak", rejectionReason },
+  });
+
+  await notify({
+    userId: booking.requestedBy,
+    title: ms.tempahan.notifikasi.ditolakTajuk,
+    body: ms.tempahan.notifikasi.ditolakBadan(booking.target.facilityNama, rejectionReason),
+    link: `/aset/tempahan/${bookingId}`,
+    channels: ["in_app", "email"],
+  });
+
+  revalidatePath("/aset/tempahan");
+  revalidatePath(`/aset/tempahan/${bookingId}`);
+  redirect(`/aset/tempahan/${bookingId}`);
 }

@@ -8,6 +8,8 @@ import {
   SLA_BUSINESS_DAYS,
   addMonthsClamped,
   generateRecurringOccurrences,
+  currentApprovalStage,
+  nextStatusOnApprove,
 } from "./booking-rules";
 
 // addBusinessDays — langkau hujung minggu
@@ -104,5 +106,15 @@ assert.equal(monthly.length, 3);
 assert.equal(monthly[0].startTime.toISOString().slice(0, 10), "2026-01-31");
 assert.equal(monthly[1].startTime.toISOString().slice(0, 10), "2026-02-28", "Feb 2026 bukan leap year, clamp ke 28");
 assert.equal(monthly[2].startTime.toISOString().slice(0, 10), "2026-03-31", "Mac balik ke 31 (bukan terjejas clamp Feb)");
+
+// currentApprovalStage / nextStatusOnApprove
+assert.equal(currentApprovalStage("menunggu_kelulusan_pic"), "pic");
+assert.equal(currentApprovalStage("menunggu_kelulusan_hq"), "hq");
+assert.equal(currentApprovalStage("diluluskan"), null, "status selesai — tiada peringkat menunggu");
+assert.equal(currentApprovalStage("ditolak"), null);
+assert.equal(currentApprovalStage("dibatalkan"), null);
+assert.equal(currentApprovalStage("perlu_pindah"), null);
+assert.equal(nextStatusOnApprove("pic"), "menunggu_kelulusan_hq");
+assert.equal(nextStatusOnApprove("hq"), "diluluskan");
 
 console.log("booking-rules.test.ts: semua assertion lulus");
