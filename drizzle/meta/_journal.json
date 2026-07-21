@@ -29,6 +29,13 @@
       "when": 1784567105468,
       "tag": "0003_aset_latihan_minimal",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784604217906,
+      "tag": "0004_aset_venue_bookings",
+      "breakpoints": true
     }
   ]
 }

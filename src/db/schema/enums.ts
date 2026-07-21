@@ -41,6 +41,17 @@ export const facilityStatusEnum = aset.enum("facility_status", [
   "tutup",
 ]);
 
+// menunggu_kelulusan/diluluskan/perlu_pindah = "aktif" (pegang slot, kena
+// semak EXCLUDE constraint). ditolak/dibatalkan = TIDAK pegang slot lagi
+// (dikecualikan dari EXCLUDE via predicate WHERE — rujuk migration).
+export const bookingStatusEnum = aset.enum("booking_status", [
+  "menunggu_kelulusan",
+  "diluluskan",
+  "ditolak",
+  "dibatalkan",
+  "perlu_pindah",
+]);
+
 export const latihan = pgSchema("latihan");
 
 export const deliveryModeEnum = latihan.enum("delivery_mode", [
