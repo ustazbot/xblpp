@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "seed:dev": "tsx scripts/seed-dev.ts"
+    "seed:dev": "tsx scripts/seed-dev.ts",
+    "escalate-sla": "tsx scripts/escalate-sla.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.12",

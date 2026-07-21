@@ -81,6 +81,10 @@ export const ms = {
     labelMaintenanceUntil: "Penyelenggaraan Sehingga",
     notaMaintenanceUntil:
       "Isi hanya jika status Penyelenggaraan. Kosongkan jika tiada tarikh tamat dijangka. Tempahan sedia ada yang bertindih akan ditanda \"Perlu Dipindah\" dan pemohon dimaklumkan.",
+    notifikasi: {
+      picDilantikTajuk: "Anda dilantik sebagai PIC premis",
+      picDilantikBadan: (venue: string) => `Anda kini PIC bagi premis ${venue}. Anda akan menerima tempahan untuk kelulusan peringkat pertama.`,
+    },
     dashboard: {
       tajuk: "Papan Pemuka",
       jumlahPremis: "Jumlah Premis",
@@ -176,6 +180,9 @@ export const ms = {
       dibatalkanSlotBadan: (fasiliti: string, venue: string) => `Tempahan untuk ${fasiliti} (${venue}) telah dibatalkan.`,
       dibatalkanPemohonTajuk: "Tempahan anda dibatalkan",
       dibatalkanPemohonBadan: (fasiliti: string) => `Tempahan ${fasiliti} anda telah dibatalkan oleh pentadbir.`,
+      eskalasiTajuk: "SLA kelulusan tertunggak — tindakan diperlukan",
+      eskalasiBadan: (fasiliti: string, venue: string, peringkat: string, hariTertunggak: number) =>
+        `Tempahan ${fasiliti} (${venue}) tertunggak kelulusan peringkat ${peringkat} selama ${hariTertunggak} hari melebihi SLA. Sila semak dan bertindak.`,
     },
     corakUlangan: {
       mingguan: "Mingguan",

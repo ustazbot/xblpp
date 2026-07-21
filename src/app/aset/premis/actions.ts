@@ -67,6 +67,16 @@ export async function createVenue(_prevState: ActionState, formData: FormData): 
     after: parsed.data,
   });
 
+  if (parsed.data.picUserId) {
+    await notify({
+      userId: parsed.data.picUserId,
+      title: ms.aset.notifikasi.picDilantikTajuk,
+      body: ms.aset.notifikasi.picDilantikBadan(parsed.data.nama),
+      link: `/aset/premis/${created.id}`,
+      channels: ["in_app", "email"],
+    });
+  }
+
   revalidatePath("/aset/premis");
   redirect(`/aset/premis/${created.id}`);
 }
@@ -109,6 +119,16 @@ export async function updateVenue(
     before,
     after: parsed.data,
   });
+
+  if (parsed.data.picUserId && parsed.data.picUserId !== before.picUserId) {
+    await notify({
+      userId: parsed.data.picUserId,
+      title: ms.aset.notifikasi.picDilantikTajuk,
+      body: ms.aset.notifikasi.picDilantikBadan(parsed.data.nama),
+      link: `/aset/premis/${venueId}`,
+      channels: ["in_app", "email"],
+    });
+  }
 
   revalidatePath("/aset/premis");
   revalidatePath(`/aset/premis/${venueId}`);
