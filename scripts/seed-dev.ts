@@ -8,9 +8,11 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { negeri, daerah, roles, users, userRoles } from "@/db/schema/core";
-import { venues, facilities } from "@/db/schema/aset";
+import { venues, facilities, venueBookings } from "@/db/schema/aset";
 import { courseCategories, courses, courseSessions } from "@/db/schema/latihan";
 import { hashPassword } from "@/lib/password";
+import { addBusinessDays, SLA_BUSINESS_DAYS } from "@/lib/booking-rules";
+import { toMalaysiaDateStr, addCalendarDays } from "@/lib/calendar-rules";
 
 const ROLES: { code: (typeof roles.$inferInsert)["code"]; nama: string }[] = [
   { code: "hq_admin", nama: "HQ Admin" },
@@ -321,7 +323,10 @@ const USERS: {
   { email: "hq.admin@example.com", nama: "Ahmad bin Ismail", telefon: "0121234501", jawatan: "Pegawai BLPP HQ", roleCode: "hq_admin" },
   { email: "negeri.perak@example.com", nama: "Siti Aminah binti Yusof", telefon: "0121234502", jawatan: "Pegawai Latihan Negeri", roleCode: "admin_negeri", negeriNama: "Perak" },
   { email: "negeri.terengganu@example.com", nama: "Mohd Faizal bin Hassan", telefon: "0121234503", jawatan: "Pegawai Latihan Negeri", roleCode: "admin_negeri", negeriNama: "Terengganu" },
-  { email: "daerah.perakTengah@example.com", nama: "Norhayati binti Abdullah", telefon: "0121234504", jawatan: "Penolong Pegawai Daerah", roleCode: "admin_daerah", negeriNama: "Perak", daerahNama: "Perak Tengah" },
+  // Emel WAJIB huruf kecil sepenuhnya — borang log masuk (auth.ts) buat
+  // .toLowerCase() sebelum carian DB, emel bercampur huruf besar/kecil di
+  // sini takkan padan (bug ditemui semasa ujian Langkah 9, dibetulkan Langkah 11).
+  { email: "daerah.perak-tengah@example.com", nama: "Norhayati binti Abdullah", telefon: "0121234504", jawatan: "Penolong Pegawai Daerah", roleCode: "admin_daerah", negeriNama: "Perak", daerahNama: "Perak Tengah" },
   { email: "daerah.kuantan@example.com", nama: "Rahman bin Ali", telefon: "0121234505", jawatan: "Penolong Pegawai Daerah", roleCode: "admin_daerah", negeriNama: "Pahang", daerahNama: "Kuantan" },
   { email: "pic.akksi@example.com", nama: "Zulkifli bin Omar", telefon: "0121234506", jawatan: "PIC Akademi", roleCode: "pic_premis", venueKod: "AKKSI" },
   { email: "pic.ilkkl@example.com", nama: "Fatimah binti Ibrahim", telefon: "0121234507", jawatan: "PIC Institut", roleCode: "pic_premis", venueKod: "ILKKL" },
@@ -509,11 +514,168 @@ async function seedDummy() {
     }
   }
   console.log(`users: ${userCount} disemak/seeded (kata laluan seragam: ${DUMMY_PASSWORD})`);
+
+  return { venueIdByKod, facilityIdByVenueAndNama };
+}
+
+// ---------------------------------------------------------------------------
+// Langkah 11 (Fasa 1a) — tempahan realistik untuk ujian end-to-end/demo,
+// liputi semua status booking_status: menunggu_kelulusan_pic/hq, diluluskan
+// (dalaman_kemas DAN umum, sekali papar medan penyewa*), ditolak, dibatalkan,
+// perlu_pindah. Tarikh relatif kepada tarikh run (offset +N hari daripada
+// hari ini, zon Malaysia) supaya kekal "semasa" tak kira bila seed dijalankan
+// — guna calendar-rules.ts (bukan Date math ad-hoc, elak isu TZ/rollover
+// sama kelas masalah addMonthsClamped).
+async function seedBookings(
+  venueIdByKod: Map<string, string>,
+  facilityIdByVenueAndNama: Map<string, string>,
+) {
+  const userIdByEmail = new Map<string, string>();
+  for (const email of ["pengarah@example.com", "hq.admin@example.com", "pic.akksi@example.com", "pic.ilkkl@example.com", "pic.plkkt@example.com"]) {
+    const [row] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (!row) throw new Error(`User tidak dijumpai untuk booking seed: ${email}`);
+    userIdByEmail.set(email, row.id);
+  }
+  const pengarah = userIdByEmail.get("pengarah@example.com")!;
+  const hqAdmin = userIdByEmail.get("hq.admin@example.com")!;
+  const picAkksi = userIdByEmail.get("pic.akksi@example.com")!;
+  const picIlkkl = userIdByEmail.get("pic.ilkkl@example.com")!;
+  const picPlkkt = userIdByEmail.get("pic.plkkt@example.com")!;
+
+  const facAkksi = facilityIdByVenueAndNama.get("AKKSI:Dewan Latihan Utama")!;
+  const facPlkktDewan = facilityIdByVenueAndNama.get("PLKKT:Dewan Latihan SPAK")!;
+  const facPlkktBilik = facilityIdByVenueAndNama.get("PLKKT:Bilik Kuliah 1")!;
+  const facIlkkl = facilityIdByVenueAndNama.get("ILKKL:Dewan Serbaguna")!;
+  if (!facAkksi || !facPlkktDewan || !facPlkktBilik || !facIlkkl) {
+    throw new Error("Fasiliti tidak dijumpai untuk booking seed — semak FACILITIES_BY_VENUE");
+  }
+
+  const today = toMalaysiaDateStr(new Date());
+  const at = (daysFromToday: number, hhmm: string) => new Date(`${addCalendarDays(today, daysFromToday)}T${hhmm}:00+08:00`);
+  const now = new Date();
+  const slaDeadline = addBusinessDays(now, SLA_BUSINESS_DAYS);
+
+  const BOOKINGS: (typeof venueBookings.$inferInsert)[] = [
+    {
+      facilityId: facAkksi,
+      requestedBy: pengarah,
+      tujuan: "Mesyuarat Perancangan Latihan Suku Tahun",
+      anggaranPeserta: 25,
+      startTime: at(5, "09:00"),
+      endTime: at(5, "12:00"),
+      status: "menunggu_kelulusan_pic",
+      jenisTempahan: "dalaman_kemas",
+      slaDeadline,
+    },
+    {
+      facilityId: facPlkktDewan,
+      requestedBy: pengarah,
+      tujuan: "Bengkel Pembangunan Modul SPAK",
+      anggaranPeserta: 30,
+      startTime: at(6, "09:00"),
+      endTime: at(6, "16:00"),
+      status: "menunggu_kelulusan_hq",
+      jenisTempahan: "dalaman_kemas",
+      picApprovedBy: picPlkkt,
+      picApprovedAt: now,
+      slaDeadline,
+    },
+    {
+      facilityId: facIlkkl,
+      requestedBy: pengarah,
+      tujuan: "Taklimat Dasar Latihan Kebangsaan",
+      anggaranPeserta: 80,
+      startTime: at(10, "09:00"),
+      endTime: at(10, "13:00"),
+      status: "diluluskan",
+      jenisTempahan: "dalaman_kemas",
+      picApprovedBy: picIlkkl,
+      picApprovedAt: now,
+      hqApprovedBy: hqAdmin,
+      hqApprovedAt: now,
+      slaDeadline,
+    },
+    {
+      facilityId: facAkksi,
+      requestedBy: pengarah,
+      tujuan: "Sewaan Dewan — Majlis Perkahwinan Komuniti",
+      anggaranPeserta: 120,
+      startTime: at(20, "10:00"),
+      endTime: at(20, "22:00"),
+      status: "diluluskan",
+      jenisTempahan: "umum",
+      penyewaNama: "Ahmad Zaki bin Osman",
+      penyewaTelefon: "012-3456789",
+      penyewaOrganisasi: "Persatuan Penduduk Bandar Baru Seri Iskandar",
+      picApprovedBy: picAkksi,
+      picApprovedAt: now,
+      hqApprovedBy: hqAdmin,
+      hqApprovedAt: now,
+      slaDeadline,
+    },
+    {
+      facilityId: facAkksi,
+      requestedBy: pengarah,
+      tujuan: "Kursus Kemahiran Digital Belia",
+      anggaranPeserta: 40,
+      startTime: at(7, "09:00"),
+      endTime: at(7, "17:00"),
+      status: "ditolak",
+      jenisTempahan: "dalaman_kemas",
+      rejectedBy: picAkksi,
+      rejectedAt: now,
+      rejectionReason: "Fasiliti tidak sesuai untuk bilangan peserta dijangka — cadang Dewan Serbaguna ILKKL.",
+      slaDeadline,
+    },
+    {
+      facilityId: facPlkktBilik,
+      requestedBy: pengarah,
+      tujuan: "Mesyuarat JKKK Bersama",
+      anggaranPeserta: 15,
+      startTime: at(15, "14:00"),
+      endTime: at(15, "17:00"),
+      status: "dibatalkan",
+      jenisTempahan: "umum",
+      penyewaNama: "Rosnah binti Idris",
+      penyewaTelefon: "013-9876543",
+      cancelledBy: pengarah,
+      cancelledAt: now,
+      cancellationReason: "Program ditangguhkan pihak penganjur.",
+      slaDeadline,
+    },
+    {
+      facilityId: facIlkkl,
+      requestedBy: pengarah,
+      tujuan: "Program Motivasi Belia",
+      anggaranPeserta: 60,
+      startTime: at(12, "09:00"),
+      endTime: at(12, "13:00"),
+      status: "perlu_pindah",
+      jenisTempahan: "dalaman_kemas",
+      picApprovedBy: picIlkkl,
+      picApprovedAt: now,
+      slaDeadline,
+    },
+  ];
+
+  let created = 0;
+  for (const b of BOOKINGS) {
+    const [existing] = await db
+      .select({ id: venueBookings.id })
+      .from(venueBookings)
+      .where(and(eq(venueBookings.facilityId, b.facilityId), eq(venueBookings.tujuan, b.tujuan)))
+      .limit(1);
+    if (existing) continue;
+    await db.insert(venueBookings).values(b);
+    created++;
+  }
+  console.log(`venue_bookings: ${BOOKINGS.length} disemak, ${created} baharu diseed`);
 }
 
 async function main() {
   await seedReference();
-  await seedDummy();
+  const { venueIdByKod, facilityIdByVenueAndNama } = await seedDummy();
+  await seedBookings(venueIdByKod, facilityIdByVenueAndNama);
   console.log("Seed dev (reference + dummy) selesai.");
 }
 
