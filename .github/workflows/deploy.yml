@@ -18,11 +18,9 @@ jobs:
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
             echo "name=prod" >> "$GITHUB_OUTPUT"
-            echo "dir=/opt/xblpp/clients/prod" >> "$GITHUB_OUTPUT"
             echo "url=https://blpp.gerakops.com" >> "$GITHUB_OUTPUT"
           else
             echo "name=staging" >> "$GITHUB_OUTPUT"
-            echo "dir=/opt/xblpp/clients/staging" >> "$GITHUB_OUTPUT"
             echo "url=https://staging-blpp.gerakops.com" >> "$GITHUB_OUTPUT"
           fi
           echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
@@ -49,30 +47,16 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy (SSH -> git pull -> docker compose build -> migrate -> restart)
-        env:
-          TARGET_DIR: ${{ steps.target.outputs.dir }}
-          GIT_REF: ${{ steps.target.outputs.ref }}
-          REPO: ${{ github.repository }}
+      - name: Deploy (SSH -> forced command ci-deploy.sh di VPS)
+        # SSH_PRIVATE_KEY discope dengan `command=` forced command dalam
+        # authorized_keys VPS (rujuk scripts/ci-deploy.sh + docs/runbook/deploy.md)
+        # — sshd abaikan command client, cuma "target ref" ni didedahkan via
+        # $SSH_ORIGINAL_COMMAND untuk wrapper parse. TIADA arbitrary shell
+        # dihantar lagi, walaupun key ni bocor blast radius terhad kepada
+        # deploy xBLPP staging/prod daripada repo GitHub tetap sahaja.
         run: |
-          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<REMOTE
-            set -euo pipefail
-            cd "$TARGET_DIR"
-            if [ ! -d .git ]; then
-              # git init/fetch/checkout (bukan `git clone .`) — folder ni dah
-              # ada .env root-only sebelum clone pertama (bootstrap manual,
-              # rujuk docs/runbook/deploy.md), `git clone .` tolak direktori
-              # tak kosong.
-              git init -q
-              git remote add origin "https://github.com/$REPO.git"
-            fi
-            git fetch origin "+$GIT_REF:refs/deploy/target" --force
-            git checkout -f refs/deploy/target
-
-            docker compose build app
-            docker compose run --rm --build migrate
-            docker compose up -d --force-recreate app
-          REMOTE
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "${{ steps.target.outputs.name }} ${{ steps.target.outputs.ref }}"
 
       - name: Smoke test
         run: |

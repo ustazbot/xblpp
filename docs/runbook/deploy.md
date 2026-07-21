@@ -17,19 +17,47 @@ ditemui semasa proses tu.
 | Trigger staging | Push ke branch `staging` |
 | Workflow | `.github/workflows/deploy.yml` |
 | Guard | Deploy staging **dilarang 8am–6pm hari bekerja** (Asia/Kuala_Lumpur) — job gagal awal jika langgar |
-| Langkah | SSH ke VPS → `git fetch`/`checkout` → `docker compose build app` → `docker compose run --rm migrate` → `docker compose up -d --force-recreate app` |
+| Langkah | SSH (`command=` forced, `scripts/ci-deploy.sh`) → `git fetch`/`checkout` → `docker compose build app` → `docker compose run --rm migrate` → `docker compose up -d --force-recreate app` |
 | Smoke test | `GET /api/health` (`src/app/api/health/route.ts`, cuba `select 1` ke DB) — retry 10x/5s selepas restart, job gagal kalau tak 200 |
 | Network Docker | `gerakops_net` (disahkan via `docker network ls` di VPS — **bukan** `gerakops_pg`, itu nama container Postgres sahaja) |
 
-## GitHub Secrets diperlukan (tambah sendiri — Settings → Secrets and variables → Actions)
+## GitHub Secrets — SIAP dijana, anda tambah sendiri ke GitHub
+
+**Status:** Key CI khusus (`xblpp-ci-deploy`, ed25519, **berasingan** dari
+`~/.ssh/gerakops_vps` admin) dah dijana atas VPS
+(`/opt/xblpp/secrets/ci_deploy_key{,.pub}`) dan discope dengan `command=`
+forced command (`/opt/xblpp/bin/ci-deploy.sh` — rujuk `scripts/ci-deploy.sh`
+dalam repo) dalam `authorized_keys` root. **Diuji sebenar (bukan andaian):**
+key ni HANYA boleh jalankan deploy staging/prod (`"staging <ref>"` /
+`"prod <ref>"`) — cubaan arbitrary command (`whoami`, dll.) ditolak wrapper
+dengan "Target tak sah", exit 1. Backup `authorized_keys` asal disimpan
+`/root/.ssh/authorized_keys.bak-<timestamp>` sebelum diubah.
+
+⚠ Saya (Claude Code) TIDAK memasukkan private key ke GitHub — itu credential,
+saya pun tak pernah print/simpan kandungannya sendiri. Anda kena tarik terus
+dari VPS dan tampal ke GitHub sendiri:
+
+```bash
+# Jalankan di terminal ANDA (guna key admin sedia ada), bukan minta saya run —
+# private key ni tak patut lalui chat/log saya langsung.
+ssh -i ~/.ssh/gerakops_vps root@212.47.72.248 cat /opt/xblpp/secrets/ci_deploy_key
+```
+
+Salin output PENUH (termasuk baris `-----BEGIN OPENSSH PRIVATE KEY-----` /
+`-----END...-----`) terus ke GitHub — Settings → Secrets and variables →
+Actions → New repository secret:
 
 | Secret | Nilai |
 |---|---|
-| `SSH_PRIVATE_KEY` | Kandungan private key untuk akses VPS. **Jangan guna `~/.ssh/gerakops_vps` sedia ada** (dikongsi projek lain) — jana key BAHARU khusus deploy xBLPP, tambah public key ke `authorized_keys` VPS, scope kebenaran kalau boleh (cth. `command=` restriction) supaya tak sama akses penuh dengan key admin. |
+| `SSH_PRIVATE_KEY` | Output command atas (private key `xblpp-ci-deploy`, BUKAN `gerakops_vps` admin key) |
 | `SSH_HOST` | `212.47.72.248` |
-| `SSH_USER` | User SSH yang ada akses `/opt/xblpp/clients/*` dan Docker (root, atau user dalam group `docker` dengan sudo terhad ke path ni sahaja) |
+| `SSH_USER` | `root` (key discope via forced command, bukan via user separation — rujuk atas) |
 
-⚠ Saya (Claude Code) TIDAK memasukkan private key ke GitHub — itu credential, kena buat sendiri dari repo Settings.
+Selepas 3 secret ni ditambah, `.github/workflows/deploy.yml` boleh deploy
+automatik bila push ke branch `staging` atau tag `v*`. Rotate key: jana
+baharu (`ssh-keygen`) di VPS, tukar baris `command=...` dalam
+`authorized_keys` ke pubkey baharu, padam pubkey lama, kemaskini
+`SSH_PRIVATE_KEY` secret GitHub.
 
 ## Bootstrap VPS — rujukan (untuk redeploy dari kosong / VPS baharu)
 
