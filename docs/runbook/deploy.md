@@ -146,11 +146,30 @@ faham untuk deploy akan datang:**
 `xblpp_staging` dan `xblpp_prod` kedua-duanya SUDAH ada schema/data lengkap
 (dari Langkah 3–9), tapi jadual bookkeeping `drizzle.__drizzle_migrations`
 KOSONG (staging) atau TAK WUJUD LANGSUNG (prod) — bermakna migration Langkah
-3–9 tak pernah direkod dijalankan via `drizzle-kit migrate` (mungkin dijalankan
-terus guna psql/raw SQL dalam sesi sebelum ni). Bila `drizzle-kit migrate`
-cuba jalan kali pertama, ia cuba REPLAY migration 0000 dari kosong →
-`CREATE TABLE core.users` gagal sebab jadual dah wujud → exit code 1 tanpa
-mesej error jelas (spinner CLI telan output ralat).
+3–9 tak pernah direkod dijalankan via `drizzle-kit migrate`. Bila
+`drizzle-kit migrate` cuba jalan kali pertama, ia cuba REPLAY migration 0000
+dari kosong → `CREATE TABLE core.users` gagal sebab jadual dah wujud → exit
+code 1 tanpa mesej error jelas (spinner CLI telan output ralat).
+
+**Root cause — siasatan penuh, bukan tekaan:** disahkan `drizzle-kit push`
+**tidak pernah** digunakan (sifar padanan merentas seluruh `git log --all -p`
++ `package.json` sejak commit pertama cuma ada `db:generate`/`db:migrate`,
+tiada `db:push`). Jadi bukan `push` jadi punca. Tapi arahan shell SEBENAR
+yang dijalankan untuk "apply" schema pada staging/prod Langkah 3/4/v3.1.1
+tidak direkod di mana-mana (git/checkpoint tak simpan sejarah terminal sesi
+lampau) — jadi **root cause pasti tidak dapat disahkan 100%**, cuma hipotesis
+paling munasabah (SQL fail yang digenerate betul, tapi bookkeeping tak
+diisi — konsisten dengan apply terus/psql, tapi tak dapat dibuktikan). Details
+penuh + akibat/garis panduan dalam
+[`docs/adr/0001-backfill-drizzle-migration-journal.md`](../adr/0001-backfill-drizzle-migration-journal.md).
+
+**Konsistensi laluan apply — DISAHKAN, bukan andaian:** semua laluan schema
+apply dalam pipeline SEKARANG (selepas Langkah 10) guna `drizzle-kit migrate`
+sahaja — `.github/workflows/deploy.yml` → `docker compose run --rm migrate` →
+Dockerfile stage `migrate` (`npx drizzle-kit migrate`); bootstrap manual VPS
+hari ni guna laluan SAMA. `package.json` cuma ada `db:generate` + `db:migrate`
+(tiada `db:push`). Tiada laluan lain dalam repo/CI yang boleh apply schema
+tanpa lalui `drizzle-kit migrate` — disemak terus kod, bukan tekaan.
 
 **Fix yang dibuat (one-time, dah settle, JANGAN ulang):** jalankan
 `docker compose run --rm --build migrate` atas Postgres 16 **kosong/throwaway**
@@ -173,6 +192,16 @@ on conflict do nothing;
 Selepas backfill ni, `drizzle-kit migrate` idempotent macam biasa — migration
 **baharu** (0004 dst., lepas ni) akan apply betul-betul tanpa isu, sebab
 journal dah sync dengan realiti DB. Backfill ni cuma perlu SEKALI, dah siap.
+
+⚠ **JANGAN** `DELETE`/`TRUNCATE` 4 baris dalam `drizzle.__drizzle_migrations`
+ni untuk "reset bersih" — ia backfill SENGAJA (rujuk ADR di atas), bukan data
+rosak. Padam ia akan sebabkan `drizzle-kit migrate` cuba REPLAY migration
+lama dan gagal semula macam yang berlaku hari ni. **JANGAN SEKALI-KALI**
+`psql -f`/tampal SQL terus atau `drizzle-kit push` terhadap
+`xblpp_staging`/`xblpp_prod` untuk schema baharu — SENTIASA `drizzle-kit
+generate` → semak SQL → `drizzle-kit migrate` (throwaway → staging → prod),
+sama seperti Langkah 3–9. Itu satu-satunya cara journal kekal sync dengan
+realiti DB.
 
 ## Isu diketahui / tindakan tertunggak
 
