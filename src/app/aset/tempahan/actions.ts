@@ -4,7 +4,7 @@ import { eq, and, inArray, lt, gt } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { can } from "@/lib/rbac";
+import { can, type RoleAssignment } from "@/lib/rbac";
 import { db } from "@/db";
 import { venueBookings, facilities, venues } from "@/db/schema/aset";
 import { users, roles, userRoles } from "@/db/schema/core";
@@ -17,6 +17,8 @@ import {
   generateRecurringOccurrences,
   currentApprovalStage,
   nextStatusOnApprove,
+  canCancelBooking,
+  cancellationRequiresReason,
   type BookingOccurrence,
 } from "@/lib/booking-rules";
 import { logAudit } from "@/lib/audit";
@@ -330,6 +332,7 @@ interface BookingWithTarget {
   status: string;
   requestedBy: string;
   tujuan: string;
+  startTime: Date;
   target: BookingTarget;
 }
 
@@ -340,6 +343,7 @@ async function loadBookingWithTarget(bookingId: string): Promise<BookingWithTarg
       status: venueBookings.status,
       requestedBy: venueBookings.requestedBy,
       tujuan: venueBookings.tujuan,
+      startTime: venueBookings.startTime,
       facilityId: venueBookings.facilityId,
       facilityNama: facilities.nama,
       venueId: venues.id,
@@ -359,6 +363,7 @@ async function loadBookingWithTarget(bookingId: string): Promise<BookingWithTarg
     status: row.status,
     requestedBy: row.requestedBy,
     tujuan: row.tujuan,
+    startTime: row.startTime,
     target: {
       facilityId: row.facilityId,
       facilityNama: row.facilityNama,
@@ -535,6 +540,101 @@ export async function rejectBooking(
     link: `/aset/tempahan/${bookingId}`,
     channels: ["in_app", "email"],
   });
+
+  revalidatePath("/aset/tempahan");
+  revalidatePath(`/aset/tempahan/${bookingId}`);
+  redirect(`/aset/tempahan/${bookingId}`);
+}
+
+// Langkah 9 — pembatalan. Dibenarkan untuk (a) PEMOHON ASAL (pemilikan,
+// sama pattern "semak pemilikan di call-site" rbac.ts) ATAU (b) sesiapa
+// dengan permission booking:update blanket (hq_admin/admin_negeri —
+// pentadbiran, bukan pemilik). Async (panggil can()) jadi boleh terus
+// export dari fail "use server" ni, tak perlukan fail berasingan macam
+// approval-roles.ts (yang synchronous, tak boleh export dari fail ni).
+export async function canCancelAccess(
+  user: { id: string; roles: RoleAssignment[] },
+  booking: { requestedBy: string; venueId: string; negeriId: string; daerahId: string | null },
+): Promise<boolean> {
+  if (booking.requestedBy === user.id) return true;
+  return can(user, "update", "booking", {
+    venueId: booking.venueId,
+    negeriId: booking.negeriId,
+    daerahId: booking.daerahId ?? undefined,
+  });
+}
+
+export async function cancelBooking(
+  bookingId: string,
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const booking = await loadBookingWithTarget(bookingId);
+  if (!booking) {
+    return { error: ms.ralat.umum };
+  }
+
+  const now = new Date();
+  if (!canCancelBooking(booking.status, booking.startTime, now)) {
+    return { error: ms.tempahan.ralat.tidakBolehBatal };
+  }
+  if (
+    !(await canCancelAccess(session.user, {
+      requestedBy: booking.requestedBy,
+      venueId: booking.target.venueId,
+      negeriId: booking.target.negeriId,
+      daerahId: booking.target.daerahId,
+    }))
+  ) {
+    return { error: ms.ralat.tiadaAkses };
+  }
+
+  const cancellationReason = String(formData.get("cancellationReason") ?? "").trim();
+  if (cancellationRequiresReason(booking.startTime, now) && !cancellationReason) {
+    return { error: ms.tempahan.ralat.sebabBatalWajib };
+  }
+
+  await db
+    .update(venueBookings)
+    .set({
+      status: "dibatalkan",
+      cancelledBy: session.user.id,
+      cancelledAt: now,
+      cancellationReason: cancellationReason || null,
+      updatedAt: now,
+    })
+    .where(eq(venueBookings.id, bookingId));
+
+  await logAudit({
+    userId: session.user.id,
+    action: "booking_cancel",
+    entityType: "venue_booking",
+    entityId: bookingId,
+    before: { status: booking.status },
+    after: { status: "dibatalkan", cancellationReason: cancellationReason || null },
+  });
+
+  if (booking.target.picUserId) {
+    await notify({
+      userId: booking.target.picUserId,
+      title: ms.tempahan.notifikasi.dibatalkanSlotTajuk,
+      body: ms.tempahan.notifikasi.dibatalkanSlotBadan(booking.target.facilityNama, booking.target.venueNama),
+      link: `/aset/tempahan/${bookingId}`,
+      channels: ["in_app"],
+    });
+  }
+  if (session.user.id !== booking.requestedBy) {
+    await notify({
+      userId: booking.requestedBy,
+      title: ms.tempahan.notifikasi.dibatalkanPemohonTajuk,
+      body: ms.tempahan.notifikasi.dibatalkanPemohonBadan(booking.target.facilityNama),
+      link: `/aset/tempahan/${bookingId}`,
+      channels: ["in_app", "email"],
+    });
+  }
 
   revalidatePath("/aset/tempahan");
   revalidatePath(`/aset/tempahan/${bookingId}`);

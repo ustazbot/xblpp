@@ -12,6 +12,8 @@ import {
   nextStatusOnApprove,
   isBookingAffectedByMaintenance,
   daysUntil,
+  cancellationRequiresReason,
+  canCancelBooking,
 } from "./booking-rules";
 
 // addBusinessDays — langkau hujung minggu
@@ -162,5 +164,34 @@ assert.equal(
 assert.equal(daysUntil(new Date("2026-07-24T10:00:00Z"), new Date("2026-07-21T10:00:00Z")), 3);
 assert.equal(daysUntil(new Date("2026-07-21T10:00:00Z"), new Date("2026-07-21T10:00:00Z")), 0);
 assert.equal(daysUntil(new Date("2026-07-19T10:00:00Z"), new Date("2026-07-21T10:00:00Z")), -2, "tarikh dah lepas — negatif (tertunggak)");
+
+// cancellationRequiresReason
+const cNow = new Date("2026-07-21T00:00:00Z");
+assert.equal(
+  cancellationRequiresReason(new Date("2026-07-25T00:00:00Z"), cNow),
+  false,
+  "4 hari lagi — sebab tak wajib",
+);
+assert.equal(
+  cancellationRequiresReason(new Date("2026-07-23T12:00:00Z"), cNow),
+  true,
+  "2.5 hari lagi — sebab WAJIB",
+);
+assert.equal(
+  cancellationRequiresReason(new Date("2026-07-21T01:00:00Z"), cNow),
+  true,
+  "beberapa jam sahaja — sebab WAJIB",
+);
+
+// canCancelBooking
+assert.equal(canCancelBooking("menunggu_kelulusan_pic", new Date("2026-08-01T00:00:00Z"), cNow), true);
+assert.equal(canCancelBooking("diluluskan", new Date("2026-08-01T00:00:00Z"), cNow), true);
+assert.equal(canCancelBooking("ditolak", new Date("2026-08-01T00:00:00Z"), cNow), false, "dah ditolak — tak boleh batal");
+assert.equal(canCancelBooking("dibatalkan", new Date("2026-08-01T00:00:00Z"), cNow), false, "dah dibatalkan");
+assert.equal(
+  canCancelBooking("diluluskan", new Date("2026-07-01T00:00:00Z"), cNow),
+  false,
+  "tarikh dah lepas — tak boleh batal",
+);
 
 console.log("booking-rules.test.ts: semua assertion lulus");

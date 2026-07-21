@@ -104,7 +104,13 @@ export const venueBookings = aset.table("venue_bookings", {
   rejectedBy: uuid("rejected_by").references(() => users.id),
   rejectedAt: timestamp("rejected_at", { withTimezone: true }),
   rejectionReason: text("rejection_reason"),
+  // Langkah 9 — pembatalan. cancelledBy/At ditambah eksplisit (bukan hanya
+  // audit_logs) sama pattern picApprovedBy/At, hqApprovedBy/At, rejectedBy/At
+  // atas — perlu paparan terus pada butiran tempahan + query laporan
+  // penggunaan tanpa JOIN audit_logs.
   cancellationReason: text("cancellation_reason"),
+  cancelledBy: uuid("cancelled_by").references(() => users.id),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   // SLA kelulusan 3 hari bekerja — dikira semasa create, disemak cron
   // eskalasi (Langkah 5).
   slaDeadline: timestamp("sla_deadline", { withTimezone: true }).notNull(),

@@ -55,3 +55,28 @@ export function RejectForm({
     </form>
   );
 }
+
+export function CancelForm({
+  action,
+  wajibSebab,
+}: {
+  action: (state: ActionState, formData: FormData) => Promise<ActionState>;
+  wajibSebab: boolean;
+}) {
+  const [state, formAction] = useFormState(action, initialState);
+  return (
+    <form action={formAction} className="flex max-w-sm flex-col gap-2">
+      <Label htmlFor="cancellationReason">
+        {wajibSebab ? ms.tempahan.labelSebabBatal : ms.tempahan.labelSebabBatalOpsyenal}
+      </Label>
+      <Textarea id="cancellationReason" name="cancellationReason" required={wajibSebab} />
+      {wajibSebab && <p className="text-xs text-muted-foreground">{ms.tempahan.notaSebabBatalWajib}</p>}
+      <SubmitButton label={ms.tempahan.hantarPembatalan} variant="destructive" />
+      {state.error && (
+        <p className="text-sm text-destructive" role="alert">
+          {state.error}
+        </p>
+      )}
+    </form>
+  );
+}

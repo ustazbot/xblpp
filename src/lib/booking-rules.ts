@@ -138,3 +138,24 @@ export function daysUntil(target: Date, now: Date): number {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.ceil((target.getTime() - now.getTime()) / msPerDay);
 }
+
+// Langkah 9 — Pembatalan. <3 hari KALENDAR sebelum tarikh guna (startTime)
+// = sebab WAJIB diisi (rekod untuk laporan penggunaan, kes pembatalan
+// last-minute perlu justifikasi). >=3 hari, sebab masih boleh diisi tapi
+// tak diwajibkan app-layer.
+export const CANCELLATION_REASON_THRESHOLD_DAYS = 3;
+
+export function cancellationRequiresReason(startTime: Date, now: Date): boolean {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysUntilUsage = (startTime.getTime() - now.getTime()) / msPerDay;
+  return daysUntilUsage < CANCELLATION_REASON_THRESHOLD_DAYS;
+}
+
+// Tempahan boleh dibatalkan hanya jika masih PEGANG slot (bukan dah
+// ditolak/dibatalkan sedia ada) DAN belum bermula — sama sebab macam
+// isPastBooking() (create), tempahan yang dah berlaku tak masuk akal
+// "dibatalkan".
+export function canCancelBooking(status: string, startTime: Date, now: Date): boolean {
+  const cancellableStatuses = ["menunggu_kelulusan_pic", "menunggu_kelulusan_hq", "diluluskan", "perlu_pindah"];
+  return cancellableStatuses.includes(status) && !isPastBooking(startTime, now);
+}

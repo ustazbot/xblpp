@@ -8,15 +8,16 @@ import { venueBookings, facilities, venues } from "@/db/schema/aset";
 import { users } from "@/db/schema/core";
 import { Badge } from "@/components/ui/badge";
 import { ms } from "@/constants/ms";
-import { currentApprovalStage } from "@/lib/booking-rules";
+import { currentApprovalStage, canCancelBooking, cancellationRequiresReason } from "@/lib/booking-rules";
 import { canActOnStage } from "../approval-roles";
-import { approveBooking, rejectBooking } from "../actions";
-import { ApproveForm, RejectForm } from "./approval-actions";
+import { approveBooking, rejectBooking, cancelBooking, canCancelAccess } from "../actions";
+import { ApproveForm, RejectForm, CancelForm } from "./approval-actions";
 
 const requestedByUser = alias(users, "requested_by_user");
 const picApprovedByUser = alias(users, "pic_approved_by_user");
 const hqApprovedByUser = alias(users, "hq_approved_by_user");
 const rejectedByUser = alias(users, "rejected_by_user");
+const cancelledByUser = alias(users, "cancelled_by_user");
 
 const STATUS_BADGE_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
   menunggu_kelulusan_pic: "secondary",
@@ -48,16 +49,21 @@ export default async function TempahanDetailPage({ params }: { params: { id: str
       hqApprovedAt: venueBookings.hqApprovedAt,
       rejectionReason: venueBookings.rejectionReason,
       rejectedAt: venueBookings.rejectedAt,
+      cancellationReason: venueBookings.cancellationReason,
+      cancelledAt: venueBookings.cancelledAt,
       slaDeadline: venueBookings.slaDeadline,
       facilityNama: facilities.nama,
       venueId: venues.id,
       venueNama: venues.nama,
       negeriId: venues.negeriId,
       daerahId: venues.daerahId,
+      picUserId: venues.picUserId,
+      requestedBy: venueBookings.requestedBy,
       requestedByNama: requestedByUser.nama,
       picApprovedByNama: picApprovedByUser.nama,
       hqApprovedByNama: hqApprovedByUser.nama,
       rejectedByNama: rejectedByUser.nama,
+      cancelledByNama: cancelledByUser.nama,
     })
     .from(venueBookings)
     .innerJoin(facilities, eq(venueBookings.facilityId, facilities.id))
@@ -66,6 +72,7 @@ export default async function TempahanDetailPage({ params }: { params: { id: str
     .leftJoin(picApprovedByUser, eq(venueBookings.picApprovedBy, picApprovedByUser.id))
     .leftJoin(hqApprovedByUser, eq(venueBookings.hqApprovedBy, hqApprovedByUser.id))
     .leftJoin(rejectedByUser, eq(venueBookings.rejectedBy, rejectedByUser.id))
+    .leftJoin(cancelledByUser, eq(venueBookings.cancelledBy, cancelledByUser.id))
     .where(eq(venueBookings.id, params.id))
     .limit(1);
 
@@ -84,6 +91,17 @@ export default async function TempahanDetailPage({ params }: { params: { id: str
   const stage = currentApprovalStage(booking.status);
   const canAct = stage !== null && canActOnStage(stage, session.user.roles, booking.venueId);
 
+  const now = new Date();
+  const canCancel =
+    canCancelBooking(booking.status, booking.startTime, now) &&
+    (await canCancelAccess(session.user, {
+      requestedBy: booking.requestedBy,
+      venueId: booking.venueId,
+      negeriId: booking.negeriId,
+      daerahId: booking.daerahId,
+    }));
+  const cancelWajibSebab = cancellationRequiresReason(booking.startTime, now);
+
   const dtf = new Intl.DateTimeFormat("ms-MY", {
     timeZone: "Asia/Kuala_Lumpur",
     dateStyle: "medium",
@@ -92,6 +110,7 @@ export default async function TempahanDetailPage({ params }: { params: { id: str
 
   const boundApprove = approveBooking.bind(null, booking.id);
   const boundReject = rejectBooking.bind(null, booking.id);
+  const boundCancel = cancelBooking.bind(null, booking.id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -164,6 +183,20 @@ export default async function TempahanDetailPage({ params }: { params: { id: str
             <dd>{dtf.format(booking.slaDeadline)}</dd>
           </>
         )}
+        {booking.cancelledAt && (
+          <>
+            <dt className="text-muted-foreground">{ms.tempahan.dibatalkanOleh}</dt>
+            <dd>
+              {booking.cancelledByNama} — {dtf.format(booking.cancelledAt)}
+              {booking.cancellationReason && (
+                <>
+                  <br />
+                  {booking.cancellationReason}
+                </>
+              )}
+            </dd>
+          </>
+        )}
       </dl>
 
       {canAct && (
@@ -175,6 +208,13 @@ export default async function TempahanDetailPage({ params }: { params: { id: str
             <ApproveForm action={boundApprove} />
           </div>
           <RejectForm action={boundReject} />
+        </div>
+      )}
+
+      {canCancel && (
+        <div className="flex flex-col gap-4 rounded-md border p-4">
+          <p className="text-sm font-medium">{ms.tempahan.batalkanTempahan}</p>
+          <CancelForm action={boundCancel} wajibSebab={cancelWajibSebab} />
         </div>
       )}
     </div>

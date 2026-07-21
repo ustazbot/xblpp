@@ -142,11 +142,19 @@ export const ms = {
     slaDeadline: "Tarikh Akhir SLA",
     tindakanPic: "Tindakan Kelulusan (Peringkat PIC)",
     tindakanHq: "Tindakan Kelulusan (Peringkat HQ)",
+    batalkanTempahan: "Batalkan Tempahan",
+    labelSebabBatal: "Sebab Pembatalan",
+    labelSebabBatalOpsyenal: "Sebab Pembatalan (opsyenal)",
+    notaSebabBatalWajib: "Pembatalan kurang 3 hari sebelum tarikh guna memerlukan sebab.",
+    hantarPembatalan: "Sahkan Pembatalan",
+    dibatalkanOleh: "Dibatalkan Oleh",
     ralat: {
       tarikhLampau: "Tempahan tarikh lampau tidak dibenarkan.",
       konflik: "Fasiliti ini sudah ditempah pada masa yang bertindih. Sila pilih masa/fasiliti lain.",
       statusBukanMenunggu: "Tempahan ini sudah diproses (bukan lagi menunggu kelulusan).",
       sebabTolakWajib: "Sebab penolakan wajib diisi.",
+      tidakBolehBatal: "Tempahan ini tidak boleh dibatalkan (sudah selesai/dibatalkan/tarikh lepas).",
+      sebabBatalWajib: "Pembatalan kurang 3 hari sebelum tarikh guna memerlukan sebab.",
     },
     notifikasi: {
       picBaharuTajuk: "Tempahan baharu menunggu kelulusan anda",
@@ -164,6 +172,10 @@ export const ms = {
       perluPindahTajuk: "Tempahan anda perlu dipindah (penyelenggaraan)",
       perluPindahBadan: (fasiliti: string, venue: string) =>
         `${fasiliti} (${venue}) akan menjalani penyelenggaraan pada tarikh tempahan anda. Sila hubungi PIC premis untuk pindah tarikh/fasiliti.`,
+      dibatalkanSlotTajuk: "Slot fasiliti dibebaskan (tempahan dibatalkan)",
+      dibatalkanSlotBadan: (fasiliti: string, venue: string) => `Tempahan untuk ${fasiliti} (${venue}) telah dibatalkan.`,
+      dibatalkanPemohonTajuk: "Tempahan anda dibatalkan",
+      dibatalkanPemohonBadan: (fasiliti: string) => `Tempahan ${fasiliti} anda telah dibatalkan oleh pentadbir.`,
     },
     corakUlangan: {
       mingguan: "Mingguan",
