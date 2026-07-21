@@ -27,10 +27,42 @@ Seksyen 5 (konsep pipeline) + Seksyen 6 langkah 10.
 
 ## Bootstrap VPS — WAJIB sebelum run pertama workflow ni
 
-Status semasa (disahkan via SSH semasa Langkah 10): `/opt/xblpp/clients/prod` dan
-`/opt/xblpp/clients/staging` **kosong**, bukan git repo lagi. Checkpoint Langkah 9
-menyebut Caddy vhost "auto-provisioned" — **itu silap/pramatang**, disahkan semasa
-Langkah 10: `/etc/caddy/sites/` tiada fail untuk `blpp`. Checklist sebenar:
+Status disahkan via SSH semasa Langkah 10:
+
+- `/opt/xblpp/clients/{prod,staging}` kosong, bukan git repo lagi (bootstrap
+  ni jalankan clone pertama).
+- **Caddy vhost SEBENARNYA dah wujud** — `xblpp-prod.caddy` /
+  `xblpp-staging.caddy` dalam `/opt/gerakops/caddy/sites/` (mount ke
+  `/etc/caddy/sites/` dalam container `gerakops_caddy`; direktori host
+  `/etc/caddy/sites/` yang saya semak mula-mula silap path — checkpoint
+  Langkah 9 memang betul pasal ni, saya yang tersilap semak). Isi:
+  ```
+  blpp.gerakops.com {
+      reverse_proxy nextjs_xblpp_prod:3000
+  }
+  staging-blpp.gerakops.com {
+      reverse_proxy nextjs_xblpp_staging:3000
+  }
+  ```
+  Ini **reverse_proxy ke nama container** (bukan `localhost:<port>`), ikut
+  pattern client sedia ada (n10/n14/.../gerakops) — semua atas network
+  `gerakops_net` yang sama. **Tiada tindakan Caddy diperlukan** — hanya
+  pastikan container app dinamakan TEPAT `nextjs_xblpp_prod` /
+  `nextjs_xblpp_staging` (`docker-compose.yml` baca dari `.env`
+  `CONTAINER_NAME`, WAJIB padan).
+- DNS `blpp.gerakops.com` / `staging-blpp.gerakops.com` sudah resolve ke
+  `212.47.72.248` — TLS auto-provision Caddy patut jalan sebaik container app
+  hidup dan Caddy dapat proxy jawapan 200 daripadanya.
+
+⚠ **Jangan publish port app ke host** (`ports:` dalam compose) — VPS ni pakai
+ufw (22/80/443 sahaja) TAPI Docker letak rule sendiri dalam chain
+`DOCKER-USER`/`FORWARD` yang **pintas ufw** untuk port yang di-`-p`/`ports:`
+publish (disahkan `iptables -L DOCKER-USER` semasa Langkah 10 — chain kosong,
+tiada mitigation `ufw-docker` dipasang). `docker-compose.yml` repo ni dah
+disunting supaya TIADA `ports:` — app capai Caddy semata-mata melalui nama
+container atas `gerakops_net`.
+
+Checklist:
 
 1. **`.env` setiap environment** (`/opt/xblpp/clients/{prod,staging}/.env`, root-only,
    TIDAK masuk git — ikut `.env.example` di repo):
@@ -40,23 +72,11 @@ Langkah 10: `/etc/caddy/sites/` tiada fail untuk `blpp`. Checklist sebenar:
      (JANGAN kongsi antara prod/staging).
    - `NEXT_PUBLIC_BASE_URL` — `https://blpp.gerakops.com` (prod) /
      `https://staging-blpp.gerakops.com` (staging).
-   - `APP_PORT` — pilih port host unik per environment (cth. prod `3101`,
-     staging `3102`) — TIDAK boleh sama, dua container pada host sama.
+   - `CONTAINER_NAME` — `nextjs_xblpp_prod` / `nextjs_xblpp_staging` — WAJIB
+     TEPAT sama macam yang fail `.caddy` rujuk (lihat atas).
    - `SMTP_*` / `TELEGRAM_BOT_TOKEN` — kosongkan dulu (stub aktif, ikut
      `src/lib/notify.ts`), isi bila SMTP/Telegram sedia.
-2. **Caddy vhost** — cipta fail dalam `/etc/caddy/sites/` (ikut pattern
-   `import /etc/caddy/sites/*.caddy` dalam `/opt/gerakops/caddy/Caddyfile`) untuk
-   setiap domain, proxy ke `localhost:${APP_PORT}` environment berkenaan, contoh
-   konsep (SAHKAN format sebenar — direktori `sites/` kosong semasa Langkah 10,
-   tiada contoh sedia ada untuk disalin):
-   ```
-   blpp.gerakops.com {
-     reverse_proxy localhost:3101
-   }
-   ```
-   Reload lepas tambah: `docker exec <caddy_container> caddy reload --config /etc/caddy/Caddyfile`
-   (semak nama container Caddy sebenar dulu — `docker ps | grep caddy`).
-3. **Git clone pertama** — workflow auto-clone (`git clone` kalau `.git` tiada)
+2. **Git clone pertama** — workflow auto-clone (`git clone` kalau `.git` tiada)
    guna HTTPS awam sebab repo masih **public**. Selepas repo jadi **private**
    (rujuk nota "Tukar repo private" dalam checkpoint Fasa 0), tukar clone URL
    dalam workflow kepada SSH + tambah GitHub deploy key yang VPS boleh baca,
@@ -106,12 +126,9 @@ dibuat, rujuk seksyen atas).
 
 ## Isu diketahui / tindakan tertunggak
 
-1. Caddy vhost untuk `blpp.gerakops.com` / `staging-blpp.gerakops.com` **belum
-   wujud** — mesti dicipta manual (langkah 2 di atas) sebelum smoke test workflow
-   boleh lulus (URL akan 502/timeout sehingga vhost + `.env` + git checkout siap).
-2. `.env` setiap environment belum dicipta — workflow akan gagal di peringkat
-   `docker compose build`/`up` (env_file hilang) sehingga langkah 1 di atas siap.
-3. SSH key deploy khusus (`SSH_PRIVATE_KEY` secret) belum dijana — jangan guna
-   key admin sedia ada untuk CI.
-4. Selepas repo jadi private: clone HTTPS awam dalam workflow akan gagal, perlu
+1. SSH key deploy khusus (`SSH_PRIVATE_KEY` secret) belum dijana — jangan guna
+   key admin sedia ada untuk CI. Sehingga secret ni ditambah, workflow
+   `.github/workflows/deploy.yml` tak boleh jalan automatik (bootstrap manual
+   di atas tak bergantung padanya).
+2. Selepas repo jadi private: clone HTTPS awam dalam workflow akan gagal, perlu
    tukar ke SSH + deploy key (nota di atas).

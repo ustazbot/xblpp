@@ -1,8 +1,14 @@
 # Satu compose file, di-clone identik ke /opt/xblpp/clients/{prod,staging}.
-# Perbezaan prod/staging datang dari .env setiap folder (DATABASE_URL, APP_PORT),
-# bukan dari fail compose ni. Nama container/project auto-namespace ikut nama
-# folder (Docker Compose default project name = basename direktori) — elak
-# clash antara dua environment pada host yang sama.
+# Perbezaan prod/staging datang dari .env setiap folder (DATABASE_URL,
+# CONTAINER_NAME), bukan dari fail compose ni.
+#
+# TIADA `ports:` published sengaja — VPS ni pakai ufw (22/80/443 sahaja), tapi
+# Docker letak rule sendiri dalam chain DOCKER-USER/FORWARD yang PINTAS ufw
+# untuk port yang di-publish terus (disahkan via `iptables -L DOCKER-USER`
+# semasa Langkah 10 bootstrap). Caddy capai app terus guna nama container
+# (`nextjs_xblpp_prod`/`nextjs_xblpp_staging`, rujuk .caddy site fail sedia
+# ada) atas network `gerakops_net` yang sama — ikut pattern client sedia ada
+# (n10/n14/.../gerakops), bukan host-port-publish.
 
 services:
   app:
@@ -10,13 +16,13 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
+    container_name: ${CONTAINER_NAME}
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - "${APP_PORT:-3000}:3000"
     networks:
       - gerakops_net
+    mem_limit: 400m
 
   # `docker compose run --rm migrate` — dijalankan sekali semasa deploy,
   # bukan servis berterusan. Rujuk stage `migrate` dalam Dockerfile.
