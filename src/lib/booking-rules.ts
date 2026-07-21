@@ -116,3 +116,17 @@ export function currentApprovalStage(status: string): ApprovalStage | null {
 export function nextStatusOnApprove(stage: ApprovalStage): "menunggu_kelulusan_hq" | "diluluskan" {
   return stage === "pic" ? "menunggu_kelulusan_hq" : "diluluskan";
 }
+
+// Langkah 6 — Maintenance workflow. Tempahan "terjejas" = booking yang masih
+// akan berlaku (endTime > now) DAN bertindih dengan tempoh penyelenggaraan
+// [now, maintenanceUntil]. maintenanceUntil=null bermaksud tiada tarikh
+// tamat ditetapkan — semua tempahan akan datang pada fasiliti ni terjejas.
+export function isBookingAffectedByMaintenance(
+  occurrence: BookingOccurrence,
+  now: Date,
+  maintenanceUntil: Date | null,
+): boolean {
+  if (occurrence.endTime.getTime() <= now.getTime()) return false;
+  if (maintenanceUntil === null) return true;
+  return occurrence.startTime.getTime() <= maintenanceUntil.getTime();
+}

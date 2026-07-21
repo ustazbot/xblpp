@@ -10,6 +10,7 @@ import {
   generateRecurringOccurrences,
   currentApprovalStage,
   nextStatusOnApprove,
+  isBookingAffectedByMaintenance,
 } from "./booking-rules";
 
 // addBusinessDays — langkau hujung minggu
@@ -116,5 +117,44 @@ assert.equal(currentApprovalStage("dibatalkan"), null);
 assert.equal(currentApprovalStage("perlu_pindah"), null);
 assert.equal(nextStatusOnApprove("pic"), "menunggu_kelulusan_hq");
 assert.equal(nextStatusOnApprove("hq"), "diluluskan");
+
+// isBookingAffectedByMaintenance
+const mNow = new Date("2026-07-21T00:00:00Z");
+assert.equal(
+  isBookingAffectedByMaintenance(
+    { startTime: new Date("2026-07-20T00:00:00Z"), endTime: new Date("2026-07-20T02:00:00Z") },
+    mNow,
+    null,
+  ),
+  false,
+  "booking dah lepas — tak terjejas",
+);
+assert.equal(
+  isBookingAffectedByMaintenance(
+    { startTime: new Date("2026-08-01T00:00:00Z"), endTime: new Date("2026-08-01T02:00:00Z") },
+    mNow,
+    null,
+  ),
+  true,
+  "maintenanceUntil null — semua booking akan datang terjejas",
+);
+assert.equal(
+  isBookingAffectedByMaintenance(
+    { startTime: new Date("2026-08-01T00:00:00Z"), endTime: new Date("2026-08-01T02:00:00Z") },
+    mNow,
+    new Date("2026-07-31T23:59:59Z"),
+  ),
+  false,
+  "booking mula SELEPAS tamat maintenance — tak terjejas",
+);
+assert.equal(
+  isBookingAffectedByMaintenance(
+    { startTime: new Date("2026-07-25T00:00:00Z"), endTime: new Date("2026-07-25T02:00:00Z") },
+    mNow,
+    new Date("2026-07-31T23:59:59Z"),
+  ),
+  true,
+  "booking mula dalam tempoh maintenance — terjejas",
+);
 
 console.log("booking-rules.test.ts: semua assertion lulus");

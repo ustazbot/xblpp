@@ -124,6 +124,11 @@ export default async function PremisDetailPage({ params }: { params: { id: strin
                     <Badge variant={f.status === "aktif" ? "default" : "secondary"}>
                       {ms.aset.statusFasiliti[f.status]}
                     </Badge>
+                    {f.status === "maintenance" && f.maintenanceUntil && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {ms.aset.labelMaintenanceUntil}: {f.maintenanceUntil}
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-right">
                     {canManage && (

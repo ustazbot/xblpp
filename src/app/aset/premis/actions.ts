@@ -1,16 +1,28 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, and, inArray, gt } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { db } from "@/db";
-import { venues, facilities } from "@/db/schema/aset";
+import { venues, facilities, venueBookings } from "@/db/schema/aset";
 import { venueSchema, facilitySchema } from "@/lib/validators/aset";
+import { isBookingAffectedByMaintenance } from "@/lib/booking-rules";
 import { logAudit } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 import { ms } from "@/constants/ms";
 import { hasManageRole } from "./manage-roles";
+
+// Status booking yang masih PEGANG slot (bukan ditolak/dibatalkan/perlu_
+// pindah sedia ada) — calon untuk ditanda "perlu_pindah" bila fasiliti
+// ditanda maintenance (Langkah 6). Rujuk ACTIVE_BOOKING_STATUSES padanan
+// dalam src/app/aset/tempahan/actions.ts.
+const MAINTENANCE_AFFECTABLE_STATUSES = [
+  "menunggu_kelulusan_pic",
+  "menunggu_kelulusan_hq",
+  "diluluskan",
+] as const;
 
 export interface ActionState {
   error: string | null;
@@ -121,6 +133,7 @@ export async function createFacility(
     jenis: formData.get("jenis"),
     kapasiti: formData.get("kapasiti"),
     status: formData.get("status"),
+    maintenanceUntil: formData.get("maintenanceUntil"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? ms.ralat.umum };
@@ -165,6 +178,7 @@ export async function updateFacility(
     jenis: formData.get("jenis"),
     kapasiti: formData.get("kapasiti"),
     status: formData.get("status"),
+    maintenanceUntil: formData.get("maintenanceUntil"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? ms.ralat.umum };
@@ -186,6 +200,81 @@ export async function updateFacility(
     after: parsed.data,
   });
 
+  if (parsed.data.status === "maintenance") {
+    await cascadeMaintenanceNotify({
+      facilityId,
+      facilityNama: before.nama,
+      venueId,
+      maintenanceUntil: parsed.data.maintenanceUntil,
+      actingUserId: session.user.id,
+    });
+  }
+
   revalidatePath(`/aset/premis/${venueId}`);
   redirect(`/aset/premis/${venueId}`);
+}
+
+// Tanda tempahan sedia ada yang bertindih dengan tempoh penyelenggaraan
+// sebagai "perlu_pindah" + maklumkan pemohon. Dipanggil setiap kali fasiliti
+// disimpan dengan status=maintenance (bukan hanya sekali semasa transisi) —
+// supaya sambungan tarikh maintenanceUntil turut menangkap tempahan yang
+// baharu terjejas, tanpa jejaskan tempahan yang dah ditanda perlu_pindah
+// (tak termasuk dalam MAINTENANCE_AFFECTABLE_STATUSES, elak notifikasi berulang).
+async function cascadeMaintenanceNotify(params: {
+  facilityId: string;
+  facilityNama: string;
+  venueId: string;
+  maintenanceUntil: string | null;
+  actingUserId: string;
+}): Promise<void> {
+  const now = new Date();
+  const maintenanceUntilDate = params.maintenanceUntil
+    ? new Date(`${params.maintenanceUntil}T23:59:59+08:00`)
+    : null;
+
+  const candidates = await db
+    .select({
+      id: venueBookings.id,
+      requestedBy: venueBookings.requestedBy,
+      startTime: venueBookings.startTime,
+      endTime: venueBookings.endTime,
+      status: venueBookings.status,
+    })
+    .from(venueBookings)
+    .where(
+      and(
+        eq(venueBookings.facilityId, params.facilityId),
+        inArray(venueBookings.status, MAINTENANCE_AFFECTABLE_STATUSES),
+        gt(venueBookings.endTime, now),
+      ),
+    );
+
+  const affected = candidates.filter((b) => isBookingAffectedByMaintenance(b, now, maintenanceUntilDate));
+  if (affected.length === 0) return;
+
+  const [venue] = await db.select({ nama: venues.nama }).from(venues).where(eq(venues.id, params.venueId)).limit(1);
+
+  for (const booking of affected) {
+    await db
+      .update(venueBookings)
+      .set({ status: "perlu_pindah", updatedAt: now })
+      .where(eq(venueBookings.id, booking.id));
+
+    await logAudit({
+      userId: params.actingUserId,
+      action: "booking_maintenance_perlu_pindah",
+      entityType: "venue_booking",
+      entityId: booking.id,
+      before: { status: booking.status },
+      after: { status: "perlu_pindah" },
+    });
+
+    await notify({
+      userId: booking.requestedBy,
+      title: ms.tempahan.notifikasi.perluPindahTajuk,
+      body: ms.tempahan.notifikasi.perluPindahBadan(params.facilityNama, venue?.nama ?? ""),
+      link: `/aset/tempahan/${booking.id}`,
+      channels: ["in_app", "email"],
+    });
+  }
 }

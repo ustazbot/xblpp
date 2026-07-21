@@ -16,6 +16,7 @@ export interface FacilityFormValues {
   jenis: (typeof facilityTypeValues)[number];
   kapasiti: number;
   status: (typeof facilityStatusValues)[number];
+  maintenanceUntil?: string | null;
 }
 
 interface FacilityFormProps {
@@ -85,6 +86,17 @@ export function FacilityForm({ action, defaultValues, submitLabel }: FacilityFor
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="maintenanceUntil">{ms.aset.labelMaintenanceUntil}</Label>
+        <Input
+          id="maintenanceUntil"
+          name="maintenanceUntil"
+          type="date"
+          defaultValue={defaultValues?.maintenanceUntil ?? ""}
+        />
+        <p className="text-xs text-muted-foreground">{ms.aset.notaMaintenanceUntil}</p>
       </div>
 
       {state.error && (

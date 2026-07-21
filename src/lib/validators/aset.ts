@@ -35,4 +35,12 @@ export const facilitySchema = z.object({
   jenis: z.enum(facilityTypeValues),
   kapasiti: z.coerce.number().int().positive("Kapasiti mesti lebih daripada 0"),
   status: z.enum(facilityStatusValues),
+  // Tarikh jangka tamat penyelenggaraan — hanya relevan bila status=
+  // "maintenance", tapi disimpan tanpa syarat (harmless kalau status lain,
+  // elak kerumitan superRefine untuk medan pilihan semata-mata).
+  maintenanceUntil: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => (v ? v : null)),
 });

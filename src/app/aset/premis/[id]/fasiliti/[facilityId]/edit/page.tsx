@@ -51,6 +51,7 @@ export default async function EditFasilitiPage({
           jenis: facility.jenis,
           kapasiti: facility.kapasiti,
           status: facility.status,
+          maintenanceUntil: facility.maintenanceUntil,
         }}
         submitLabel={ms.aset.kemaskini}
       />

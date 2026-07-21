@@ -78,6 +78,9 @@ export const ms = {
       maintenance: "Penyelenggaraan",
       tutup: "Tutup",
     },
+    labelMaintenanceUntil: "Penyelenggaraan Sehingga",
+    notaMaintenanceUntil:
+      "Isi hanya jika status Penyelenggaraan. Kosongkan jika tiada tarikh tamat dijangka. Tempahan sedia ada yang bertindih akan ditanda \"Perlu Dipindah\" dan pemohon dimaklumkan.",
   },
   tempahan: {
     tajuk: "Tempahan",
@@ -141,6 +144,9 @@ export const ms = {
       diluluskanBadan: (fasiliti: string) => `Tempahan ${fasiliti} telah diluluskan sepenuhnya (PIC + HQ).`,
       ditolakTajuk: "Tempahan ditolak",
       ditolakBadan: (fasiliti: string, sebab: string) => `Tempahan ${fasiliti} ditolak. Sebab: ${sebab}`,
+      perluPindahTajuk: "Tempahan anda perlu dipindah (penyelenggaraan)",
+      perluPindahBadan: (fasiliti: string, venue: string) =>
+        `${fasiliti} (${venue}) akan menjalani penyelenggaraan pada tarikh tempahan anda. Sila hubungi PIC premis untuk pindah tarikh/fasiliti.`,
     },
     corakUlangan: {
       mingguan: "Mingguan",
