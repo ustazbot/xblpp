@@ -13,10 +13,10 @@ ditemui semasa proses tu.
 
 | Item | Spesifikasi |
 |---|---|
-| Trigger prod | Push tag `v*` (cth. `v0.1.0`) |
-| Trigger staging | Push ke branch `staging` |
+| Trigger prod | Push tag `v*` (cth. `v0.1.0`), atau manual (`workflow_dispatch`, pilih `prod`) |
+| Trigger staging | Push ke branch `staging`, atau manual (`workflow_dispatch`, pilih `staging`) |
 | Workflow | `.github/workflows/deploy.yml` |
-| Guard | Deploy staging **dilarang 8am–6pm hari bekerja** (Asia/Kuala_Lumpur) — job gagal awal jika langgar |
+| Guard | Deploy staging **dilarang 8am–6pm hari bekerja** (Asia/Kuala_Lumpur) — job gagal awal jika langgar. TERPAKAI hanya untuk auto-trigger push; run manual (`workflow_dispatch`, klik "Run workflow" di GitHub) langkau guard ni — kelulusan manusia eksplisit dianggap cukup |
 | Langkah | SSH (`command=` forced, `scripts/ci-deploy.sh`) → `git fetch`/`checkout` → `docker compose build app` → `docker compose run --rm migrate` → `docker compose up -d --force-recreate app` |
 | Smoke test | `GET /api/health` (`src/app/api/health/route.ts`, cuba `select 1` ke DB) — retry 10x/5s selepas restart, job gagal kalau tak 200 |
 | Network Docker | `gerakops_net` (disahkan via `docker network ls` di VPS — **bukan** `gerakops_pg`, itu nama container Postgres sahaja) |

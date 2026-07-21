@@ -2,12 +2,25 @@ name: Deploy
 
 # Trigger: push tag v* -> prod (/opt/xblpp/clients/prod)
 #          push branch staging -> staging (/opt/xblpp/clients/staging)
+#          manual ("Run workflow" GitHub UI) -> pilih target, langkau guard
 # Rujuk docs/prd/xBLPP-Struktur-Repo-Schema.md Seksyen 5 dan
 # docs/runbook/deploy.md untuk bootstrap VPS yang diperlukan sebelum run pertama.
 on:
   push:
     branches: [staging]
     tags: ["v*"]
+  # Manual run ("Run workflow" di GitHub) — untuk test SSH/secrets tanpa
+  # tunggu lepas guard 8am-6pm (klik manual = kelulusan manusia eksplisit,
+  # jadi guard dilangkau untuk laluan ni sahaja; auto-trigger push tetap
+  # kena guard macam biasa, rujuk step "Guard" bawah).
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deploy ke mana"
+        required: true
+        default: staging
+        type: choice
+        options: [staging, prod]
 
 jobs:
   deploy:
@@ -16,7 +29,15 @@ jobs:
       - name: Tentukan environment
         id: target
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="${{ github.event.inputs.target }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TARGET="prod"
+          else
+            TARGET="staging"
+          fi
+
+          if [ "$TARGET" = "prod" ]; then
             echo "name=prod" >> "$GITHUB_OUTPUT"
             echo "url=https://blpp.gerakops.com" >> "$GITHUB_OUTPUT"
           else
@@ -26,7 +47,10 @@ jobs:
           echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: "Guard: staging dilarang 8am-6pm hari bekerja"
-        if: steps.target.outputs.name == 'staging'
+        # workflow_dispatch = klik manual di GitHub UI = kelulusan manusia
+        # eksplisit untuk run tu sahaja — guard ni wujud untuk elak auto-deploy
+        # push tak sengaja waktu bekerja, bukan untuk sekat test manual.
+        if: steps.target.outputs.name == 'staging' && github.event_name != 'workflow_dispatch'
         run: |
           DOW=$(TZ='Asia/Kuala_Lumpur' date +%u)
           HOUR=$(TZ='Asia/Kuala_Lumpur' date +%H)
