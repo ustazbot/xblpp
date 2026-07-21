@@ -3,11 +3,24 @@
 Rujuk PRD v3.1 Seksyen 6 (CI/CD) + `docs/prd/xBLPP-Struktur-Repo-Schema.md`
 Seksyen 5 (konsep pipeline) + Seksyen 6 langkah 10.
 
-**Status:** Kedua-dua environment LIVE atas VPS (bootstrap manual, bukan
-lagi via GitHub Actions — secret CI belum ditambah). `https://blpp.gerakops.com`
+**Status:** Kedua-dua environment LIVE, dan **CI automatik disahkan berfungsi
+sebenar** — run manual (`workflow_dispatch`) 2026-07-21 03:04 berjaya penuh
+(SSH agent → deploy → smoke test semua ✓, run ID
+[29797508282](https://github.com/ustazbot/xblpp/actions/runs/29797508282)),
+disahkan semula luar CI (`curl` + `docker inspect` selepas run, container
+`nextjs_xblpp_staging` recreate 03:05:54Z, healthy). `https://blpp.gerakops.com`
 dan `https://staging-blpp.gerakops.com` berjalan sebenar, `/api/health` 200.
 Rujuk seksyen "Bootstrap VPS" bawah untuk apa yang dah dibuat + bug yang
 ditemui semasa proses tu.
+
+**Nota ujian pertama:** run push pertama (10:55am Selasa) betul-betul kena
+guard 8am-6pm dan gagal awal (tingkah laku BETUL, bukan bug) — laluan
+SSH/secrets tak sempat diuji. Run `workflow_dispatch` manual pertama pula
+gagal di step "Setup SSH agent" (`error in libcrypto` — `SSH_PRIVATE_KEY`
+rosak semasa copy-paste ke GitHub, punca biasa untuk private key
+multi-baris). Fix: `ssh ... cat ci_deploy_key | gh secret set SSH_PRIVATE_KEY`
+(paip terus dari VPS ke GitHub, elak clipboard) — selepas set semula, run
+kedua lulus penuh.
 
 ## Ringkasan pipeline
 
@@ -21,7 +34,7 @@ ditemui semasa proses tu.
 | Smoke test | `GET /api/health` (`src/app/api/health/route.ts`, cuba `select 1` ke DB) — retry 10x/5s selepas restart, job gagal kalau tak 200 |
 | Network Docker | `gerakops_net` (disahkan via `docker network ls` di VPS — **bukan** `gerakops_pg`, itu nama container Postgres sahaja) |
 
-## GitHub Secrets — SIAP dijana, anda tambah sendiri ke GitHub
+## GitHub Secrets — SIAP, disahkan berfungsi
 
 **Status:** Key CI khusus (`xblpp-ci-deploy`, ed25519, **berasingan** dari
 `~/.ssh/gerakops_vps` admin) dah dijana atas VPS
