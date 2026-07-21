@@ -100,9 +100,23 @@ export const ms = {
     amaranKelulusanNegeri:
       "Tempahan lebih 12 bulan ke hadapan memerlukan perhatian tambahan semasa semakan HQ.",
     amaranDwiKelulusan: "Setiap tempahan perlu kelulusan PIC premis, kemudian kelulusan HQ.",
+    tempahBerulang: "Tempah Berulang",
+    labelCorakUlangan: "Corak Ulangan",
+    labelBilanganUlangan: "Bilangan Ulangan",
+    notaKejadianPertama: "Tarikh/masa di atas ialah kejadian PERTAMA — kejadian seterusnya dijana automatik.",
+    simpanBerulang: "Hantar Siri Tempahan",
+    ringkasanBerulang: "Ringkasan Siri Tempahan",
+    ringkasanBerjaya: (created: number, total: number) => `${created} daripada ${total} kejadian berjaya ditempah.`,
+    ringkasanGagalTajuk: "Kejadian yang gagal:",
+    lihatSenarai: "Lihat Senarai Tempahan",
+    tempahLagiSatu: "Tempah Lagi",
     ralat: {
       tarikhLampau: "Tempahan tarikh lampau tidak dibenarkan.",
       konflik: "Fasiliti ini sudah ditempah pada masa yang bertindih. Sila pilih masa/fasiliti lain.",
+    },
+    corakUlangan: {
+      mingguan: "Mingguan",
+      bulanan: "Bulanan",
     },
     jenisTempahan: {
       dalaman_kemas: "Dalaman KEMAS (HQ/Negeri/Daerah)",

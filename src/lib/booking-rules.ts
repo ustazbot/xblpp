@@ -42,3 +42,59 @@ export function isPastBooking(startTime: Date, now: Date): boolean {
 export function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
 }
+
+// Langkah 4 — Recurring booking.
+export const recurringPatternValues = ["mingguan", "bulanan"] as const;
+// Had selamat elak silap taip (cth. 500 kiraan) jana beratus tempahan tanpa
+// sengaja — 52 mingguan ~ 1 tahun, 24 bulanan ~ 2 tahun (cukup generous untuk
+// kelas berkala biasa, PRD tak nyatakan had khusus).
+export const MAX_RECURRING_COUNT = 52;
+
+// Tambah bulan dengan CLAMP hari ke hari terakhir bulan sasaran kalau hari
+// asal tak wujud (cth. 31 Jan + 1 bulan -> 28/29 Feb, BUKAN "3 Mac" — JS Date
+// punya tingkah laku setMonth() default rollover ke bulan seterusnya, silap
+// untuk tempahan berkala). set ke hari 1 dulu sebelum ubah bulan supaya
+// pengiraan bulan sasaran sendiri tak terjejas oleh rollover hari asal.
+export function addMonthsClamped(date: Date, months: number): Date {
+  const originalDay = date.getDate();
+  const result = new Date(date);
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+  const lastDayOfTargetMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(originalDay, lastDayOfTargetMonth));
+  result.setHours(date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds());
+  return result;
+}
+
+export interface BookingOccurrence {
+  startTime: Date;
+  endTime: Date;
+}
+
+// Jana N kejadian daripada tempahan pertama (kekuda tarikh+masa+tempoh),
+// mingguan (+7 hari setiap kejadian) atau bulanan (+1 bulan, clamp hari —
+// rujuk addMonthsClamped). Pure — tiada IO, konflik/kelulusan disemak per
+// kejadian oleh caller (actions.ts).
+export function generateRecurringOccurrences(
+  startTime: Date,
+  endTime: Date,
+  pattern: (typeof recurringPatternValues)[number],
+  count: number,
+): BookingOccurrence[] {
+  const occurrences: BookingOccurrence[] = [];
+  for (let i = 0; i < count; i++) {
+    if (pattern === "mingguan") {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      start.setDate(start.getDate() + i * 7);
+      end.setDate(end.getDate() + i * 7);
+      occurrences.push({ startTime: start, endTime: end });
+    } else {
+      occurrences.push({
+        startTime: addMonthsClamped(startTime, i),
+        endTime: addMonthsClamped(endTime, i),
+      });
+    }
+  }
+  return occurrences;
+}

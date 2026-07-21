@@ -67,9 +67,14 @@ export default async function TempahanPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{ms.tempahan.tajuk}</h1>
-        <Button asChild>
-          <Link href="/aset/tempahan/baharu">{ms.tempahan.tempahBaharu}</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link href="/aset/tempahan/berulang">{ms.tempahan.tempahBerulang}</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/aset/tempahan/baharu">{ms.tempahan.tempahBaharu}</Link>
+          </Button>
+        </div>
       </div>
 
       {visibleRows.length === 0 ? (
