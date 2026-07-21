@@ -81,6 +81,23 @@ export const ms = {
     labelMaintenanceUntil: "Penyelenggaraan Sehingga",
     notaMaintenanceUntil:
       "Isi hanya jika status Penyelenggaraan. Kosongkan jika tiada tarikh tamat dijangka. Tempahan sedia ada yang bertindih akan ditanda \"Perlu Dipindah\" dan pemohon dimaklumkan.",
+    dashboard: {
+      tajuk: "Papan Pemuka",
+      jumlahPremis: "Jumlah Premis",
+      jumlahFasiliti: "Jumlah Fasiliti",
+      kadarPenggunaan: "Kadar Penggunaan Fasiliti",
+      kadarPenggunaanNota: (guna: number, jumlah: number) => `${guna} daripada ${jumlah} fasiliti ada tempahan aktif/akan datang`,
+      tempahanMenungguKelulusan: "Tempahan Menunggu Kelulusan",
+      tiadaMenungguKelulusan: "Tiada tempahan menunggu kelulusan.",
+      slaLagi: (hari: number) => `${hari} hari lagi`,
+      slaTertunggak: (hari: number) => `Tertunggak ${hari} hari`,
+      slaHariIni: "Tamat tempoh hari ini",
+      statusPenyelenggaraan: "Fasiliti Dalam Penyelenggaraan",
+      tiadaPenyelenggaraan: "Tiada fasiliti dalam penyelenggaraan.",
+      aktivitiTerkini: "Aktiviti Terkini",
+      tiadaAktiviti: "Tiada aktiviti direkodkan.",
+      pautanCepat: "Pautan Pantas",
+    },
   },
   tempahan: {
     tajuk: "Tempahan",

@@ -130,3 +130,11 @@ export function isBookingAffectedByMaintenance(
   if (maintenanceUntil === null) return true;
   return occurrence.startTime.getTime() <= maintenanceUntil.getTime();
 }
+
+// Langkah 7 — Dashboard. Baki hari kalendar sehingga tarikh sasaran (boleh
+// negatif = dah tertunggak) — untuk paparan countdown SLA, bukan pengiraan
+// SLA itu sendiri (addBusinessDays di atas kekal punca kebenaran tarikh).
+export function daysUntil(target: Date, now: Date): number {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.ceil((target.getTime() - now.getTime()) / msPerDay);
+}

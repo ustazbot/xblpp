@@ -11,6 +11,7 @@ import {
   currentApprovalStage,
   nextStatusOnApprove,
   isBookingAffectedByMaintenance,
+  daysUntil,
 } from "./booking-rules";
 
 // addBusinessDays — langkau hujung minggu
@@ -156,5 +157,10 @@ assert.equal(
   true,
   "booking mula dalam tempoh maintenance — terjejas",
 );
+
+// daysUntil
+assert.equal(daysUntil(new Date("2026-07-24T10:00:00Z"), new Date("2026-07-21T10:00:00Z")), 3);
+assert.equal(daysUntil(new Date("2026-07-21T10:00:00Z"), new Date("2026-07-21T10:00:00Z")), 0);
+assert.equal(daysUntil(new Date("2026-07-19T10:00:00Z"), new Date("2026-07-21T10:00:00Z")), -2, "tarikh dah lepas — negatif (tertunggak)");
 
 console.log("booking-rules.test.ts: semua assertion lulus");
