@@ -59,7 +59,12 @@ jobs:
             set -euo pipefail
             cd "$TARGET_DIR"
             if [ ! -d .git ]; then
-              git clone "https://github.com/$REPO.git" .
+              # git init/fetch/checkout (bukan `git clone .`) — folder ni dah
+              # ada .env root-only sebelum clone pertama (bootstrap manual,
+              # rujuk docs/runbook/deploy.md), `git clone .` tolak direktori
+              # tak kosong.
+              git init -q
+              git remote add origin "https://github.com/$REPO.git"
             fi
             git fetch origin "+$GIT_REF:refs/deploy/target" --force
             git checkout -f refs/deploy/target

@@ -3,6 +3,12 @@
 Rujuk PRD v3.1 Seksyen 6 (CI/CD) + `docs/prd/xBLPP-Struktur-Repo-Schema.md`
 Seksyen 5 (konsep pipeline) + Seksyen 6 langkah 10.
 
+**Status:** Kedua-dua environment LIVE atas VPS (bootstrap manual, bukan
+lagi via GitHub Actions — secret CI belum ditambah). `https://blpp.gerakops.com`
+dan `https://staging-blpp.gerakops.com` berjalan sebenar, `/api/health` 200.
+Rujuk seksyen "Bootstrap VPS" bawah untuk apa yang dah dibuat + bug yang
+ditemui semasa proses tu.
+
 ## Ringkasan pipeline
 
 | Item | Spesifikasi |
@@ -25,9 +31,10 @@ Seksyen 5 (konsep pipeline) + Seksyen 6 langkah 10.
 
 ⚠ Saya (Claude Code) TIDAK memasukkan private key ke GitHub — itu credential, kena buat sendiri dari repo Settings.
 
-## Bootstrap VPS — WAJIB sebelum run pertama workflow ni
+## Bootstrap VPS — rujukan (untuk redeploy dari kosong / VPS baharu)
 
-Status disahkan via SSH semasa Langkah 10:
+Status disahkan via SSH semasa Langkah 10 (dah settle, rujuk "status: SIAP"
+bawah untuk apa yang sebenarnya jadi):
 
 - `/opt/xblpp/clients/{prod,staging}` kosong, bukan git repo lagi (bootstrap
   ni jalankan clone pertama).
@@ -121,8 +128,51 @@ dan dibetulkan semasa uji end-to-end (`docker build` + `docker compose run migra
 Selepas tiga fix di atas: `docker compose build app` → `docker compose run --rm
 --build migrate` → `docker compose up -d --force-recreate app` → `curl
 /api/health` → `200 {"status":"ok"}`, dan `docker inspect` health status jadi
-`healthy`. Diuji tempatan sahaja (bukan atas VPS sebenar — bootstrap VPS belum
-dibuat, rujuk seksyen atas).
+`healthy`.
+
+## Bootstrap VPS — status: SIAP (kedua-dua environment LIVE)
+
+Dijalankan penuh atas VPS sebenar (bukan simulasi) — `.env` x2, git checkout
+x2, build+migrate+up x2, disahkan via `curl https://{blpp,staging-blpp}.gerakops.com/api/health`
+luar VPS → `200 {"status":"ok"}` sebenar, TLS Caddy auto-provisioned (DNS dah
+resolve ke `212.47.72.248` sebelum ni). Container `nextjs_xblpp_prod` /
+`nextjs_xblpp_staging` sihat (`docker inspect ... Health.Status` = `healthy`),
+~23MB RAM setiap satu (had `mem_limit: 400m`), tiada kesan pada 5 client lain
+atau `gerakops_pg` dikongsi.
+
+**⚠ Bug ditemui semasa bootstrap sebenar (BUKAN dalam ujian tempatan) — WAJIB
+faham untuk deploy akan datang:**
+
+`xblpp_staging` dan `xblpp_prod` kedua-duanya SUDAH ada schema/data lengkap
+(dari Langkah 3–9), tapi jadual bookkeeping `drizzle.__drizzle_migrations`
+KOSONG (staging) atau TAK WUJUD LANGSUNG (prod) — bermakna migration Langkah
+3–9 tak pernah direkod dijalankan via `drizzle-kit migrate` (mungkin dijalankan
+terus guna psql/raw SQL dalam sesi sebelum ni). Bila `drizzle-kit migrate`
+cuba jalan kali pertama, ia cuba REPLAY migration 0000 dari kosong →
+`CREATE TABLE core.users` gagal sebab jadual dah wujud → exit code 1 tanpa
+mesej error jelas (spinner CLI telan output ralat).
+
+**Fix yang dibuat (one-time, dah settle, JANGAN ulang):** jalankan
+`docker compose run --rm --build migrate` atas Postgres 16 **kosong/throwaway**
+untuk dapatkan hash SHA-256 sebenar 4 migration (`0000`–`0003`) yang
+drizzle-kit sendiri jana, sahkan dulu penanda schema sebenar (lajur
+`ic_hash`/`failed_login_attempts`, skema `aset`/`latihan`) memang wujud dalam
+DB sasaran (bukan andaian), baru `INSERT` 4 baris tu terus ke
+`drizzle.__drizzle_migrations` staging & prod (hash sama utk kedua-dua sebab
+fail migration sama):
+
+```sql
+insert into drizzle.__drizzle_migrations (hash, created_at) values
+('5046e57ead53360ac1939de80e93a24558f70667b76a9b0f77b5b374dd5699d5', 1784559815335),
+('a2d6172f3a8e310a4c0fe77d83e553140a09054dc830ce3b7fc23676896a0a19', 1784562791899),
+('80b694fed23ad10adc7af0d14761bf325efa33255cda677708c1ec5592896e2d', 1784563562316),
+('095f7fc4f72182684b224e8cb391711dd0c69bf4ea8ef2486fc3bba88d998f88', 1784567105468)
+on conflict do nothing;
+```
+
+Selepas backfill ni, `drizzle-kit migrate` idempotent macam biasa — migration
+**baharu** (0004 dst., lepas ni) akan apply betul-betul tanpa isu, sebab
+journal dah sync dengan realiti DB. Backfill ni cuma perlu SEKALI, dah siap.
 
 ## Isu diketahui / tindakan tertunggak
 
