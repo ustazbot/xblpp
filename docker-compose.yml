@@ -1,0 +1,37 @@
+# Satu compose file, di-clone identik ke /opt/xblpp/clients/{prod,staging}.
+# Perbezaan prod/staging datang dari .env setiap folder (DATABASE_URL, APP_PORT),
+# bukan dari fail compose ni. Nama container/project auto-namespace ikut nama
+# folder (Docker Compose default project name = basename direktori) — elak
+# clash antara dua environment pada host yang sama.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    networks:
+      - gerakops_net
+
+  # `docker compose run --rm migrate` — dijalankan sekali semasa deploy,
+  # bukan servis berterusan. Rujuk stage `migrate` dalam Dockerfile.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    env_file:
+      - .env
+    networks:
+      - gerakops_net
+    profiles:
+      - tools
+
+networks:
+  gerakops_net:
+    external: true

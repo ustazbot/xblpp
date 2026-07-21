@@ -1,0 +1,85 @@
+name: Deploy
+
+# Trigger: push tag v* -> prod (/opt/xblpp/clients/prod)
+#          push branch staging -> staging (/opt/xblpp/clients/staging)
+# Rujuk docs/prd/xBLPP-Struktur-Repo-Schema.md Seksyen 5 dan
+# docs/runbook/deploy.md untuk bootstrap VPS yang diperlukan sebelum run pertama.
+on:
+  push:
+    branches: [staging]
+    tags: ["v*"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tentukan environment
+        id: target
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "name=prod" >> "$GITHUB_OUTPUT"
+            echo "dir=/opt/xblpp/clients/prod" >> "$GITHUB_OUTPUT"
+            echo "url=https://blpp.gerakops.com" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=staging" >> "$GITHUB_OUTPUT"
+            echo "dir=/opt/xblpp/clients/staging" >> "$GITHUB_OUTPUT"
+            echo "url=https://staging-blpp.gerakops.com" >> "$GITHUB_OUTPUT"
+          fi
+          echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: "Guard: staging dilarang 8am-6pm hari bekerja"
+        if: steps.target.outputs.name == 'staging'
+        run: |
+          DOW=$(TZ='Asia/Kuala_Lumpur' date +%u)
+          HOUR=$(TZ='Asia/Kuala_Lumpur' date +%H)
+          NOW=$(TZ='Asia/Kuala_Lumpur' date)
+          if [ "$DOW" -le 5 ] && [ "$HOUR" -ge 8 ] && [ "$HOUR" -lt 18 ]; then
+            echo "::error::Deploy staging dilarang 8am-6pm hari bekerja (semasa: $NOW, Asia/Kuala_Lumpur)"
+            exit 1
+          fi
+          echo "Guard lulus — semasa: $NOW (Asia/Kuala_Lumpur)"
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Percaya host key VPS
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy (SSH -> git pull -> docker compose build -> migrate -> restart)
+        env:
+          TARGET_DIR: ${{ steps.target.outputs.dir }}
+          GIT_REF: ${{ steps.target.outputs.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" bash -s <<REMOTE
+            set -euo pipefail
+            cd "$TARGET_DIR"
+            if [ ! -d .git ]; then
+              git clone "https://github.com/$REPO.git" .
+            fi
+            git fetch origin "+$GIT_REF:refs/deploy/target" --force
+            git checkout -f refs/deploy/target
+
+            docker compose build app
+            docker compose run --rm --build migrate
+            docker compose up -d --force-recreate app
+          REMOTE
+
+      - name: Smoke test
+        run: |
+          URL="${{ steps.target.outputs.url }}/api/health"
+          for i in $(seq 1 10); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "Smoke test lulus: $URL -> 200"
+              exit 0
+            fi
+            echo "Cubaan $i/10: $URL -> $CODE, tunggu 5s..."
+            sleep 5
+          done
+          echo "::error::Smoke test gagal — $URL tidak return 200 selepas 10 cubaan. Rujuk docs/runbook/deploy.md untuk rollback."
+          exit 1

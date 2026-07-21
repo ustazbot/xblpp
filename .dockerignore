@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+.gstack
+.env
+.env*.local
+*.tsbuildinfo
+docs
