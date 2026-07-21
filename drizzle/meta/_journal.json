@@ -36,6 +36,13 @@
       "when": 1784604217906,
       "tag": "0004_aset_venue_bookings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784612450240,
+      "tag": "0005_aset_booking_type_dual_approval",
+      "breakpoints": true
     }
   ]
 }

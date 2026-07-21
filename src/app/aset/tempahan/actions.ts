@@ -17,10 +17,16 @@ export interface ActionState {
 }
 
 // Status yang PEGANG slot fasiliti — padan predicate WHERE constraint
-// EXCLUDE (Langkah 1, drizzle/0004_aset_venue_bookings.sql). Kalau senarai
-// ni dan predicate constraint tak sync, app-layer check ni jadi silap
-// (false negative/positive) — KEKALKAN sentiasa padan.
-const ACTIVE_BOOKING_STATUSES = ["menunggu_kelulusan", "diluluskan", "perlu_pindah"] as const;
+// EXCLUDE (dikemaskini Langkah 3.5, drizzle/0005_aset_booking_type_dual_
+// approval.sql, untuk kelulusan dwi-peringkat). Kalau senarai ni dan
+// predicate constraint tak sync, app-layer check ni jadi silap (false
+// negative/positive) — KEKALKAN sentiasa padan.
+const ACTIVE_BOOKING_STATUSES = [
+  "menunggu_kelulusan_pic",
+  "menunggu_kelulusan_hq",
+  "diluluskan",
+  "perlu_pindah",
+] as const;
 
 export async function createBooking(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const session = await auth();
@@ -28,15 +34,38 @@ export async function createBooking(_prevState: ActionState, formData: FormData)
 
   const parsed = bookingSchema.safeParse({
     facilityId: formData.get("facilityId"),
+    jenisTempahan: formData.get("jenisTempahan"),
     tujuan: formData.get("tujuan"),
     anggaranPeserta: formData.get("anggaranPeserta"),
     startTime: formData.get("startTime"),
     endTime: formData.get("endTime"),
+    penyewaNama: formData.get("penyewaNama"),
+    penyewaOrganisasi: formData.get("penyewaOrganisasi"),
+    penyewaTelefon: formData.get("penyewaTelefon"),
+    penyewaEmel: formData.get("penyewaEmel"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? ms.ralat.umum };
   }
-  const { facilityId, tujuan, anggaranPeserta, startTime, endTime } = parsed.data;
+  const {
+    facilityId,
+    jenisTempahan,
+    tujuan,
+    anggaranPeserta,
+    startTime,
+    endTime,
+    penyewaNama,
+    penyewaOrganisasi,
+    penyewaTelefon,
+    penyewaEmel,
+  } = parsed.data;
+
+  // dalaman_kemas = Pengarah/Penolong Pengarah/Pegawai KEMAS (hq_admin/
+  // admin_negeri/admin_daerah/pengarah, role sedia ada). umum = staf sama
+  // hantar BAGI PIHAK penyewa luar (bukan portal awam self-service) —
+  // keputusan 2026-07-21, rujuk xBLPP-Struktur-Repo-Schema.md Seksyen 7.
+  // Tiada sekatan role tambahan berbeza antara dua jenis ni buat masa ini —
+  // sesiapa boleh create booking (per rbac.ts) boleh hantar mana-mana jenis.
 
   const [target] = await db
     .select({
@@ -89,10 +118,15 @@ export async function createBooking(_prevState: ActionState, formData: FormData)
   const values = {
     facilityId,
     requestedBy: session.user.id,
+    jenisTempahan,
     tujuan,
     anggaranPeserta,
     startTime,
     endTime,
+    penyewaNama: jenisTempahan === "umum" ? penyewaNama : null,
+    penyewaOrganisasi: jenisTempahan === "umum" ? penyewaOrganisasi : null,
+    penyewaTelefon: jenisTempahan === "umum" ? penyewaTelefon : null,
+    penyewaEmel: jenisTempahan === "umum" ? penyewaEmel : null,
     requiresAdminNegeriApproval: needsAdminNegeriApproval(startTime, now),
     slaDeadline: addBusinessDays(now, SLA_BUSINESS_DAYS),
   };

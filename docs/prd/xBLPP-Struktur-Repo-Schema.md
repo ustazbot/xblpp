@@ -328,6 +328,37 @@ keputusan skop di bawah).
   (bukan sekadar UI), perlu kemaskini `rbac.ts` — belum dibuat, flag untuk
   semakan semula.
 
+**Keputusan skop #2 (disahkan 2026-07-21, selepas Langkah 3, sebelum Langkah 4
+— maklumat domain baharu daripada user):**
+- Dua JENIS tempahan: `dalaman_kemas` (antara Bahagian HQ/KEMAS Negeri/KEMAS
+  Daerah — dihantar oleh Pengarah/Penolong Pengarah/Pegawai KEMAS, dipetakan
+  ke role SEDIA ADA `hq_admin`/`admin_negeri`/`admin_daerah`/`pengarah`,
+  BUKAN role RBAC baharu) dan `umum` (tempahan terbuka pihak luar, kadar
+  sewaan BELUM ditetapkan — di luar skop medan `penyewa*` buat masa ini).
+  `pengarah` diberi `booking: create` (sebelum ni hanya `read`) dalam
+  `rbac.ts` untuk sokong tempahan dalaman.
+- Tempahan umum: staf KEMAS log masuk hantar BAGI PIHAK penyewa luar (medan
+  `penyewa_nama`/`penyewa_organisasi`/`penyewa_telefon`/`penyewa_emel` pada
+  `venue_bookings`, wajib nama+telefon bila jenis='umum', disahkan Zod
+  `.superRefine`) — BUKAN portal awam self-service (sistem ni tiada
+  pendaftaran awam, Auth.js Credentials sahaja).
+- Kelulusan **dwi-peringkat berurutan WAJIB untuk SEMUA tempahan** (bukan
+  setakat >12 bulan): PIC lulus dulu (`menunggu_kelulusan_pic`) -> HQ lulus
+  (`menunggu_kelulusan_hq`) -> `diluluskan`. Tolak pada MANA-MANA peringkat
+  terus tamat (tak tunggu peringkat lain). Flag `requiresAdminNegeriApproval`
+  (>12 bulan) KEKAL sebagai penanda perhatian tambahan semasa semakan HQ,
+  BUKAN lagi penentu laluan kelulusan berasingan (Langkah 5 akan detail
+  UI/logik penuh).
+- Migration `0005_aset_booking_type_dual_approval.sql`: enum `booking_status`
+  DICIPTA SEMULA (CREATE TYPE baharu + USING cast + DROP + RENAME), BUKAN
+  `ALTER TYPE ADD VALUE` — Postgres larang guna nilai enum baharu dalam
+  TRANSAKSI SAMA ia ditambah, dan `drizzle-kit migrate()` SENTIASA gabung
+  SEMUA migration pending dalam SATU transaksi (rujuk
+  `node_modules/drizzle-orm/pg-core/dialect.cjs`). Cubaan asal (ADD VALUE +
+  fail berasingan) gantung/gagal diam semasa ujian sebenar — details penuh
+  dalam komen migration 0005. Rujuk juga ADR 0001 (Fasa 0) untuk kelas isu
+  serupa (journal drizzle tak sync realiti).
+
 1. Schema `aset.venue_bookings` + constraint `EXCLUDE` (extension
    `btree_gist`) untuk conflict detection automatik peringkat fasiliti —
    migration, diuji atas throwaway Postgres (tempahan bertindih pada fasiliti
@@ -336,13 +367,16 @@ keputusan skop di bawah).
    `pic_premis` (venue sendiri sahaja, ikut skop RBAC); `admin_negeri`/
    `admin_daerah` read-only buat masa ni (rujuk keputusan skop atas).
 3. Booking creation flow (server action) — business rules PRD Modul 2:
-   tujuan + anggaran peserta + PIC pemohon wajib; tempahan tarikh lampau
-   dilarang; >12 bulan ke hadapan perlu kelulusan Admin Negeri; semakan
-   konflik app-layer (UX awal) + constraint DB (backstop).
+   jenis tempahan (dalaman_kemas/umum) + tujuan + anggaran peserta wajib;
+   tempahan tarikh lampau dilarang; >12 bulan ke hadapan flag perhatian
+   tambahan HQ; semakan konflik app-layer (UX awal) + constraint DB
+   (backstop). Status awal `menunggu_kelulusan_pic` (kelulusan dwi-peringkat,
+   rujuk Keputusan skop #2).
 4. Recurring booking (mingguan/bulanan).
-5. Approval workflow — PIC approve/reject UI, SLA kelulusan 3 hari bekerja,
-   eskalasi automatik ke Admin Negeri kalau PIC tak bertindak (perlu
-   scheduled check — cron VPS, pattern sama `backup.sh` Langkah 9).
+5. Approval workflow — kelulusan dwi-peringkat PIC->HQ (rujuk Keputusan skop
+   #2), SLA kelulusan 3 hari bekerja per peringkat, eskalasi automatik kalau
+   tak bertindak (perlu scheduled check — cron VPS, pattern sama `backup.sh`
+   Langkah 9).
 6. Maintenance workflow — tanda fasiliti/venue under maintenance, cascade
    notify tempahan sedia ada yang terjejas, status `perlu_pindah`.
 7. Dashboard admin (skop `hq_admin` nasional + `pic_premis` premis sendiri

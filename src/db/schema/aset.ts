@@ -8,6 +8,7 @@ import {
   facilityTypeEnum,
   facilityStatusEnum,
   bookingStatusEnum,
+  bookingTypeEnum,
 } from "./enums";
 
 // Sistem 1 — Pengurusan Aset & Premis. Skop Langkah 8 (Fasa 0): venues +
@@ -72,17 +73,36 @@ export const venueBookings = aset.table("venue_bookings", {
   anggaranPeserta: integer("anggaran_peserta").notNull(),
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   endTime: timestamp("end_time", { withTimezone: true }).notNull(),
-  status: bookingStatusEnum("status").notNull().default("menunggu_kelulusan"),
+  status: bookingStatusEnum("status").notNull().default("menunggu_kelulusan_pic"),
+  // dalaman_kemas (Pengarah/Penolong Pengarah/Pegawai KEMAS, role sedia ada)
+  // vs umum (pihak luar, staf hantar bagi pihak — rujuk penyewa* bawah).
+  jenisTempahan: bookingTypeEnum("jenis_tempahan").notNull(),
+  // Wajib diisi HANYA bila jenisTempahan='umum' — disahkan app-layer (Zod
+  // .superRefine), bukan DB constraint (kadar sewaan/struktur penuh tempahan
+  // umum belum ditetapkan, di luar skop Fasa 1a — rujuk enums.ts).
+  penyewaNama: varchar("penyewa_nama", { length: 255 }),
+  penyewaOrganisasi: varchar("penyewa_organisasi", { length: 255 }),
+  penyewaTelefon: varchar("penyewa_telefon", { length: 20 }),
+  penyewaEmel: varchar("penyewa_emel", { length: 255 }),
   // Kumpulan sama bila dijana dari recurring booking (Langkah 4) — null untuk
   // tempahan tunggal biasa.
   recurringGroupId: uuid("recurring_group_id"),
-  // >12 bulan ke hadapan perlu kelulusan Admin Negeri (bukan PIC) — rujuk
-  // PRD Modul 2 business rules.
+  // >12 bulan ke hadapan — flag perhatian tambahan semasa semakan HQ (Langkah
+  // 5), BUKAN lagi penentu SIAPA meluluskan (kelulusan dwi-peringkat PIC->HQ
+  // WAJIB untuk semua tempahan tak kira tarikh, keputusan 2026-07-21).
   requiresAdminNegeriApproval: boolean("requires_admin_negeri_approval")
     .notNull()
     .default(false),
-  approvedBy: uuid("approved_by").references(() => users.id),
-  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  // Kelulusan DWI-PERINGKAT berurutan: PIC dulu, baru HQ. Tolak pada
+  // MANA-MANA peringkat guna rejectedBy/rejectedAt sahaja (tak perlu
+  // rejectedStage berasingan — status sendiri dah cukup rekod peringkat mana
+  // yang tolak, sebab tak boleh sampai peringkat HQ kalau PIC dah tolak).
+  picApprovedBy: uuid("pic_approved_by").references(() => users.id),
+  picApprovedAt: timestamp("pic_approved_at", { withTimezone: true }),
+  hqApprovedBy: uuid("hq_approved_by").references(() => users.id),
+  hqApprovedAt: timestamp("hq_approved_at", { withTimezone: true }),
+  rejectedBy: uuid("rejected_by").references(() => users.id),
+  rejectedAt: timestamp("rejected_at", { withTimezone: true }),
   rejectionReason: text("rejection_reason"),
   cancellationReason: text("cancellation_reason"),
   // SLA kelulusan 3 hari bekerja — dikira semasa create, disemak cron

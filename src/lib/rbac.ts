@@ -133,7 +133,10 @@ export const PERMISSIONS: Record<RoleCode, Partial<Record<Resource, Action[]>>> 
     registration: ["read", "approve"],
     venue: ["read"],
     facility: ["read"],
-    booking: ["read"],
+    // Tempahan DALAMAN KEMAS (Pengarah/Penolong Pengarah/Pegawai KEMAS)
+    // dihantar oleh Pengarah — keputusan 2026-07-21, rujuk
+    // xBLPP-Struktur-Repo-Schema.md Seksyen 7.
+    booking: ["read", "create"],
     trainer: ["read"],
     user: ["read"],
     repository: ["read"],

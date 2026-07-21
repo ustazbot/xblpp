@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { ms } from "@/constants/ms";
 
 const STATUS_BADGE_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
-  menunggu_kelulusan: "secondary",
+  menunggu_kelulusan_pic: "secondary",
+  menunggu_kelulusan_hq: "secondary",
   diluluskan: "default",
   ditolak: "destructive",
   dibatalkan: "destructive",
@@ -26,6 +27,7 @@ export default async function TempahanPage() {
     .select({
       id: venueBookings.id,
       tujuan: venueBookings.tujuan,
+      jenisTempahan: venueBookings.jenisTempahan,
       startTime: venueBookings.startTime,
       endTime: venueBookings.endTime,
       status: venueBookings.status,
@@ -79,6 +81,7 @@ export default async function TempahanPage() {
               <tr>
                 <th className="p-3 font-medium">{ms.aset.premis}</th>
                 <th className="p-3 font-medium">{ms.tempahan.labelFasiliti}</th>
+                <th className="p-3 font-medium">{ms.tempahan.labelJenisTempahan}</th>
                 <th className="p-3 font-medium">{ms.tempahan.labelTujuan}</th>
                 <th className="p-3 font-medium">{ms.tempahan.labelMasaMula}</th>
                 <th className="p-3 font-medium">{ms.tempahan.labelMasaTamat}</th>
@@ -90,6 +93,7 @@ export default async function TempahanPage() {
                 <tr key={b.id} className="border-t">
                   <td className="p-3">{b.venueNama}</td>
                   <td className="p-3">{b.facilityNama}</td>
+                  <td className="p-3">{ms.tempahan.jenisTempahan[b.jenisTempahan]}</td>
                   <td className="p-3">{b.tujuan}</td>
                   <td className="p-3">{dtf.format(b.startTime)}</td>
                   <td className="p-3">{dtf.format(b.endTime)}</td>
