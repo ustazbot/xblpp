@@ -79,6 +79,31 @@ export const ms = {
       tutup: "Tutup",
     },
   },
+  tempahan: {
+    tajuk: "Tempahan",
+    tempahBaharu: "Tempah Fasiliti",
+    labelFasiliti: "Fasiliti",
+    labelTujuan: "Tujuan",
+    labelAnggaranPeserta: "Anggaran Bilangan Peserta",
+    labelMasaMula: "Masa Mula",
+    labelMasaTamat: "Masa Tamat",
+    labelStatus: "Status",
+    simpan: "Hantar Tempahan",
+    tiadaTempahan: "Tiada tempahan lagi.",
+    amaranKelulusanNegeri:
+      "Tempahan lebih 12 bulan ke hadapan memerlukan kelulusan Admin Negeri (bukan PIC premis).",
+    ralat: {
+      tarikhLampau: "Tempahan tarikh lampau tidak dibenarkan.",
+      konflik: "Fasiliti ini sudah ditempah pada masa yang bertindih. Sila pilih masa/fasiliti lain.",
+    },
+    status: {
+      menunggu_kelulusan: "Menunggu Kelulusan",
+      diluluskan: "Diluluskan",
+      ditolak: "Ditolak",
+      dibatalkan: "Dibatalkan",
+      perlu_pindah: "Perlu Dipindah",
+    },
+  },
   latihan: {
     kursus: "Kursus",
     pendaftaran: "Pendaftaran",
