@@ -303,3 +303,59 @@ Jalankan `drizzle-kit generate` (bukan tulis SQL manual terus ke prod) supaya mi
 10. GitHub Actions deploy workflow + smoke test staging.
 
 Siap #1–#10 = Fasa 0 selesai, masuk Fasa 1a (Sistem Aset penuh).
+
+---
+
+## 7. Urutan kerja Fasa 1a — Sistem 1 (Pengurusan Aset & Premis) penuh
+
+Skop: PRD-KEMAS-Training-Platform-v2.md Modul 2 (baris 291-311) +
+PRD-xBLPP-v3.1.md baris 454. Asas sedia ada dari Fasa 0 Langkah 8:
+`aset.venues`/`aset.facilities` + seed 7 premis sebenar; `rbac.ts` sudah ada
+`booking` sebagai Resource + `approve` sebagai Action, `PERMISSIONS` matrix
+untuk venue/facility/booking sudah diisi (Fasa 0, belum disemak semula untuk
+keputusan skop di bawah).
+
+**Keputusan skop (disahkan 2026-07-21, sebelum Langkah 1 mula):**
+- Create/edit UI untuk venue/facility (Langkah 2) dan dashboard admin
+  (Langkah 7) **HANYA** untuk `hq_admin` (nasional) dan `pic_premis` (premis
+  sendiri) — BUKAN `admin_negeri`/`admin_daerah`, walaupun PRD asal
+  (PRD-KEMAS-Training-Platform-v2.md baris 242) sebut `admin_negeri` = "Manage
+  negeri" dan `rbac.ts` `PERMISSIONS` sedia ada bagi `admin_negeri` penuh
+  `venue: ALL`/`facility: ALL`. Ini keputusan **skop UI untuk fasa ni sahaja**
+  (potongan MVP) — `rbac.ts` TIDAK diubah, `admin_negeri`/`admin_daerah`
+  masih ada permission asal, cuma UI create/edit/dashboard tak dibina untuk
+  mereka buat masa ni. Kalau ini sepatutnya sekatan permission sebenar
+  (bukan sekadar UI), perlu kemaskini `rbac.ts` — belum dibuat, flag untuk
+  semakan semula.
+
+1. Schema `aset.venue_bookings` + constraint `EXCLUDE` (extension
+   `btree_gist`) untuk conflict detection automatik peringkat fasiliti —
+   migration, diuji atas throwaway Postgres (tempahan bertindih pada fasiliti
+   sama WAJIB ditolak oleh Postgres sendiri, bukan setakat app-layer check).
+2. Venue/Facility CRUD UI — create+edit untuk `hq_admin` (nasional) dan
+   `pic_premis` (venue sendiri sahaja, ikut skop RBAC); `admin_negeri`/
+   `admin_daerah` read-only buat masa ni (rujuk keputusan skop atas).
+3. Booking creation flow (server action) — business rules PRD Modul 2:
+   tujuan + anggaran peserta + PIC pemohon wajib; tempahan tarikh lampau
+   dilarang; >12 bulan ke hadapan perlu kelulusan Admin Negeri; semakan
+   konflik app-layer (UX awal) + constraint DB (backstop).
+4. Recurring booking (mingguan/bulanan).
+5. Approval workflow — PIC approve/reject UI, SLA kelulusan 3 hari bekerja,
+   eskalasi automatik ke Admin Negeri kalau PIC tak bertindak (perlu
+   scheduled check — cron VPS, pattern sama `backup.sh` Langkah 9).
+6. Maintenance workflow — tanda fasiliti/venue under maintenance, cascade
+   notify tempahan sedia ada yang terjejas, status `perlu_pindah`.
+7. Dashboard admin (skop `hq_admin` nasional + `pic_premis` premis sendiri
+   sahaja, rujuk keputusan skop atas) — statistik (jumlah premis/fasiliti,
+   kadar penggunaan), tempahan menunggu kelulusan + countdown SLA, status
+   maintenance, aktiviti terkini.
+8. Calendar view (harian/mingguan/bulanan, per venue dan per fasiliti) —
+   `/api/facilities/{id}/calendar`.
+9. Pembatalan tempahan — <3 hari sebelum tarikh guna perlu sebab, direkod
+   untuk laporan penggunaan.
+10. Wiring notifikasi (`notify.ts`) + audit log (`audit.ts`) merentas semua
+    langkah atas — guna helper sedia ada Fasa 0 Langkah 6-7, bukan logik baharu.
+11. Ujian end-to-end (seed booking realistik) + deploy staging melalui CI
+    pipeline sedia ada (Fasa 0 Langkah 10) + smoke test.
+
+Siap #1–#11 = Fasa 1a selesai.
