@@ -181,6 +181,22 @@ export const ms = {
       dibatalkan: "Dibatalkan",
       perlu_pindah: "Perlu Dipindah",
     },
+    kalendar: {
+      tajuk: "Kalendar Tempahan",
+      lihatKalendar: "Kalendar",
+      view: {
+        harian: "Harian",
+        mingguan: "Mingguan",
+        bulanan: "Bulanan",
+      },
+      sebelum: "◀ Sebelum",
+      seterusnya: "Seterusnya ▶",
+      hariIni: "Hari Ini",
+      tiadaTempahan: "Tiada tempahan.",
+      fasilitiLain: "Fasiliti Lain (premis sama)",
+      // Isnin mula minggu — padan startOfWeek() calendar-rules.ts.
+      hariSingkatan: ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu", "Ahad"],
+    },
   },
   latihan: {
     kursus: "Kursus",

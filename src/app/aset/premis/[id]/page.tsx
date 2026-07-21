@@ -131,10 +131,16 @@ export default async function PremisDetailPage({ params }: { params: { id: strin
                     )}
                   </td>
                   <td className="p-3 text-right">
+                    <Link
+                      href={`/aset/premis/${venue.id}/fasiliti/${f.id}/kalendar`}
+                      className="text-sm underline-offset-2 hover:underline"
+                    >
+                      {ms.tempahan.kalendar.lihatKalendar}
+                    </Link>
                     {canManage && (
                       <Link
                         href={`/aset/premis/${venue.id}/fasiliti/${f.id}/edit`}
-                        className="text-sm underline-offset-2 hover:underline"
+                        className="ml-3 text-sm underline-offset-2 hover:underline"
                       >
                         {ms.aset.kemaskini}
                       </Link>
