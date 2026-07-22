@@ -1,6 +1,19 @@
 import argon2 from "argon2";
+import crypto from "crypto";
 
 export const PASSWORD_MIN_LENGTH = 10;
+
+// Password sementara bila admin cipta/reset akaun (forcePasswordChange=true
+// selepas) — admin bacakan/hantar sekali sahaja (WhatsApp/telefon), TIDAK
+// disimpan plaintext (rujuk caller: hash terus, tempPassword hanya dalam
+// ActionState untuk paparan sekali). Set aksara elak keliru bila ditaip
+// semula (tiada 0/O, 1/l/I).
+const TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+
+export function generateTempPassword(length = 12): string {
+  const bytes = crypto.randomBytes(length);
+  return Array.from(bytes, (b) => TEMP_PASSWORD_ALPHABET[b % TEMP_PASSWORD_ALPHABET.length]).join("");
+}
 
 // argon2id — rujuk PRD Seksyen 7 (bukan argon2i/argon2d).
 export function hashPassword(plain: string): Promise<string> {

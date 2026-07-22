@@ -16,9 +16,9 @@ export default function ApexPage() {
       <Image
         src="/brand/kemas/Kemas Logo Vector.svg"
         alt="KEMAS"
-        width={200}
-        height={64}
-        className="h-16 w-auto"
+        width={500}
+        height={500}
+        className="h-32 w-32 sm:h-40 sm:w-40"
         priority
       />
       <div className="space-y-2">
