@@ -252,19 +252,37 @@ realiti DB.
    di atas tak bergantung padanya).
 2. Selepas repo jadi private: clone HTTPS awam dalam workflow akan gagal, perlu
    tukar ke SSH + deploy key (nota di atas).
+3. `blppkemas.com` guna default nameserver `ns1/ns2.hawkdns.net` (BUKAN
+   nameserver Shinjiru) — DNS diurus via portal Shinjiru juga tapi tab
+   berlainan (`Domains → Manage DNS`, bukan "Nameservers"/"Private
+   Nameservers" dalam sidebar domain), guna login sama. Jangan cari "DNS
+   Zone Editor" dalam sidebar domain — tiada, ia di top-nav dropdown.
 
-## Domain baharu blppkemas.com — draf Caddy (BELUM diapply, manual)
+## Domain baharu blppkemas.com — status: SIAP (staging + prod LIVE)
 
-Subdomain routing (`aset.`/`lms.`/apex/`staging-aset.`/`staging-lms.`) kini
-dikendalikan oleh `middleware.ts` + `src/lib/host.ts` — app sama, container
-sama, network `gerakops_net` sama. `blpp.gerakops.com` (fail
-`xblpp-{prod,staging}.caddy` sedia ada) **TAK disentuh**.
+Subdomain routing (`aset.`/`lms.`/apex/`staging-aset.`/`staging-lms.`)
+dikendalikan oleh `middleware.ts` + `src/lib/host.ts` — SATU app, SATU
+container per environment (`nextjs_xblpp_prod`/`nextjs_xblpp_staging`), network
+`gerakops_net` sama. `blpp.gerakops.com` (fail `xblpp-{prod,staging}.caddy`
+sedia ada) **TAK disentuh** — masih hidup, belum di-redirect/padam (rujuk
+guardrail bawah).
 
-**Fail baharu** — jangan gabung dgn `xblpp-{prod,staging}.caddy` sedia ada,
-supaya boleh padam/rollback berasingan tanpa jejas domain lama:
+**DNS (HawkDNS, bukan Shinjiru — rujuk nota "Isu diketahui" di bawah untuk
+kenapa):**
+
+| Host | Rekod | Nota |
+|---|---|---|
+| `blppkemas.com` (apex) | A → `212.47.72.248` | Ditukar drpd placeholder `127.0.0.1` (auto-generate semasa create zone) |
+| `aset.blppkemas.com` | A → `212.47.72.248` | Baharu |
+| `lms.blppkemas.com` | A → `212.47.72.248` | Baharu |
+| `staging-aset.blppkemas.com` | A → `212.47.72.248` | Baharu |
+| `staging-lms.blppkemas.com` | A → `212.47.72.248` | Baharu |
+
+**Caddy** — fail berasingan `/opt/gerakops/caddy/sites/xblpp-blppkemas.caddy`
+(sengaja tak gabung dgn `xblpp-{prod,staging}.caddy` sedia ada, supaya boleh
+padam/rollback berasingan tanpa jejas domain lama), LIVE:
 
 ```
-# /opt/gerakops/caddy/sites/xblpp-blppkemas.caddy
 aset.blppkemas.com, lms.blppkemas.com, blppkemas.com {
     reverse_proxy nextjs_xblpp_prod:3000
 }
@@ -273,22 +291,28 @@ staging-aset.blppkemas.com, staging-lms.blppkemas.com {
 }
 ```
 
-**Langkah manual (saya tak jalankan ni sendiri):**
+**`.env`** (`/opt/xblpp/clients/{prod,staging}/.env`) — kedua-dua ada
+`ROOT_DOMAIN=blppkemas.com` + `COOKIE_DOMAIN=.blppkemas.com`.
 
-1. DNS di Shinjiru — 5 A record (`aset`, `lms`, `@`/apex, `staging-aset`,
-   `staging-lms`) → `212.47.72.248`.
-2. `.env` prod (`/opt/xblpp/clients/prod/.env`): tambah
-   `ROOT_DOMAIN=blppkemas.com` + `COOKIE_DOMAIN=.blppkemas.com`.
-3. `.env` staging: sama dua baris (root domain tetap `blppkemas.com`,
-   prefix `staging-` datang dari hostname sendiri, bukan env berasingan).
-4. Simpan draf di atas sebagai
-   `/opt/gerakops/caddy/sites/xblpp-blppkemas.caddy` di VPS.
-5. Reload Caddy: `docker exec gerakops_caddy caddy reload --config /etc/caddy/Caddyfile`
-   (sahkan path config sebenar dulu — ikut cara `xblpp-{prod,staging}.caddy`
-   sedia ada di-load, jangan andaikan).
-6. `docker compose up -d --force-recreate app` kedua-dua environment supaya
-   `ROOT_DOMAIN`/`COOKIE_DOMAIN` termuat.
-7. Uji staging dulu (dua-dua domain lama & baharu hidup serentak) sebelum
-   ulang kat prod — rujuk senarai ujian manual dalam EXECUTION PLAN Task 1.
-8. **JANGAN** padam/redirect `blpp.gerakops.com` sehingga semua subdomain
-   baharu disahkan stabil.
+**Deploy:** kod di-deploy via `gh workflow run deploy.yml --ref {main,staging}
+-f target={prod,staging}` (`workflow_dispatch` — bypass guard 8am-6pm sebab
+run manual disahkan, bukan push tak sengaja). Kedua-dua smoke test lulus.
+
+**Ujian disahkan (staging, akaun seed sedia ada):**
+- Cookie session `Domain=.blppkemas.com` betul — SSO merentas `aset.`↔`lms.`
+  tanpa login semula (`/api/auth/session` sah kat kedua-dua host guna cookie
+  sama).
+- Role tanpa akses (`penceramah`) di host salah (`aset.`) → redirect SILANG
+  HOST ke `lms.../portal` (bukan laluan dalaman 404).
+- Role admin-landing di host betul → terus subsistem, bukan dua-pintu lama.
+
+**Sahkan prod (tanpa ganggu):** baseline 12 site lain (`gerakops.com`, n10-n28,
+`demo01`, `status`, `blpp.gerakops.com`, `staging-*`) disemak SEBELUM & SELEPAS
+setiap reload Caddy — status sama, tiada regresi. Login-role test **tak**
+dijalankan atas prod (elak guna kredential ujian atas DB prod sebenar) —
+logik sama persis dgn staging yang dah teruji.
+
+**Baki (guardrail, belum dibuat):**
+- `blpp.gerakops.com` **belum** di-redirect/padam — tunggu tempoh pemerhatian
+  subdomain baharu stabil dulu.
+- Tempoh pemerhatian belum ditetapkan — bincang bila nak proceed.
