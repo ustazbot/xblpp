@@ -41,6 +41,20 @@ export const facilityStatusEnum = aset.enum("facility_status", [
   "tutup",
 ]);
 
+// Aduan kerosakan — berasingan penuh drpd facility_status (keputusan
+// pilot: tiada automasi silang, admin set "maintenance" manual macam
+// sekarang, aduan sekadar rekod/tracking).
+export const aduanKategoriEnum = aset.enum("aduan_kategori", [
+  "awam_sivil",
+  "elektrikal",
+  "mekanikal",
+  "paip_saliran",
+  "keselamatan",
+  "landskap_kebersihan",
+]);
+export const aduanKeterukanEnum = aset.enum("aduan_keterukan", ["kritikal", "major", "minor"]);
+export const aduanStatusEnum = aset.enum("aduan_status", ["dilaporkan", "dalam_tindakan", "selesai"]);
+
 // Kelulusan DWI-PERINGKAT berurutan (keputusan 2026-07-21, rujuk
 // xBLPP-Struktur-Repo-Schema.md Seksyen 7): PIC lulus dulu -> HQ lulus ->
 // diluluskan penuh. Tolak pada MANA-MANA peringkat terus tamat (tak

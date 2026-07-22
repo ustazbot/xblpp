@@ -50,6 +50,13 @@
       "when": 1784631193226,
       "tag": "0006_aset_booking_cancellation",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784714878889,
+      "tag": "0007_rare_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }

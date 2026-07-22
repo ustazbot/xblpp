@@ -13,7 +13,7 @@ function stripPort(host: string): string {
   return host.split(":")[0];
 }
 
-function isNewDomainHost(host: string): boolean {
+export function isNewDomainHost(host: string): boolean {
   return ROOT_DOMAIN !== "" && stripPort(host).endsWith(ROOT_DOMAIN);
 }
 
@@ -21,7 +21,7 @@ export function isApexHost(host: string): boolean {
   return ROOT_DOMAIN !== "" && stripPort(host) === ROOT_DOMAIN;
 }
 
-function subdomainLabel(host: string): string | null {
+export function subdomainLabel(host: string): string | null {
   if (!isNewDomainHost(host) || isApexHost(host)) return null;
   const h = stripPort(host);
   return h.slice(0, h.length - ROOT_DOMAIN.length - 1); // buang ".ROOT_DOMAIN"
@@ -111,4 +111,24 @@ export function externalUrlFor(req: NextRequest, internalPath: string): URL {
   const staging = (label ?? "").startsWith("staging-");
   const targetHost = `${labelFor(subsystem, staging)}.${ROOT_DOMAIN}`;
   return new URL(externalPath + search, `https://${targetHost}`);
+}
+
+export interface SwitcherLinks {
+  aset: string;
+  lms: string;
+}
+
+// Pautan tukar sistem untuk header dikongsi — domain lama (path-based)
+// hala terus laluan dalaman; domain baharu bina URL subdomain lain (host
+// semasa tentukan prod/staging, tiada env var berasingan diperlukan).
+export function switcherLinksFor(host: string): SwitcherLinks {
+  if (!isNewDomainHost(host)) {
+    return { aset: "/aset", lms: "/latihan/portal" };
+  }
+  const label = subdomainLabel(host) ?? "";
+  const staging = label.startsWith("staging-");
+  return {
+    aset: `https://${labelFor("aset", staging)}.${ROOT_DOMAIN}`,
+    lms: `https://${labelFor("latihan", staging)}.${ROOT_DOMAIN}`,
+  };
 }

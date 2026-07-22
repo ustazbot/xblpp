@@ -15,7 +15,8 @@ export type Resource =
   | "competency"
   | "report"
   | "settings"
-  | "import";
+  | "import"
+  | "aduan";
 
 export type RoleCode =
   | "hq_admin"
@@ -71,6 +72,9 @@ export const PERMISSIONS: Record<RoleCode, Partial<Record<Resource, Action[]>>> 
     report: ["read", "export"],
     settings: ["create", "read", "update", "delete"],
     import: ["create", "read"],
+    // Aduan kerosakan: hq_admin (nasional) + pic_premis (skop premis
+    // sendiri) sahaja boleh hantar/tindakan/selesai — keputusan pilot.
+    aduan: ["create", "read", "update"],
   },
   admin_negeri: {
     course: ["create", "read", "update", "approve", "export"],
@@ -106,6 +110,7 @@ export const PERMISSIONS: Record<RoleCode, Partial<Record<Resource, Action[]>>> 
     user: ["read"],
     repository: ["create", "read"],
     report: ["read", "export"],
+    aduan: ["create", "read", "update"],
   },
   penceramah: {
     course: ["read"],

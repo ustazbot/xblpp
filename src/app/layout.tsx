@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Instrument_Serif, Space_Grotesk } from "next/font/google";
+import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { ms } from "@/constants/ms";
 
@@ -12,10 +12,11 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
 });
-const instrumentSerif = Instrument_Serif({
+// Display: Plus Jakarta Sans Bold (bukan Instrument Serif italic — ditukar
+// atas maklum balas semakan pilot, "oldschool" rasa serif untuk tajuk).
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: "400",
-  style: ["italic", "normal"],
+  weight: ["700", "800"],
   variable: "--font-display",
 });
 
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="ms"
-      className={cn("font-sans", spaceGrotesk.variable, instrumentSerif.variable)}
+      className={cn("font-sans", spaceGrotesk.variable, plusJakartaSans.variable)}
     >
       <body className="antialiased">{children}</body>
     </html>

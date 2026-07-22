@@ -82,3 +82,27 @@
     text-wrap: balance;
   }
 }
+
+/* Cetak dashboard (papan pemuka aset dll) — margin professional + sembunyikan
+   chrome interaktif (nav/butang), pastikan border table kekal nampak. */
+@media print {
+  @page {
+    margin: 16mm 14mm;
+  }
+  .print-hide {
+    display: none !important;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+  table,
+  th,
+  td {
+    border-color: #999 !important;
+  }
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}

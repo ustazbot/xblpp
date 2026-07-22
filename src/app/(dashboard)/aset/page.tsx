@@ -4,12 +4,14 @@ import { eq, and, inArray, gt, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { isHqAdmin } from "@/lib/rbac";
 import { db } from "@/db";
-import { venues, facilities, venueBookings } from "@/db/schema/aset";
+import { venues, facilities, venueBookings, aduanKerosakan } from "@/db/schema/aset";
 import { users, auditLogs } from "@/db/schema/core";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ms } from "@/constants/ms";
 import { daysUntil } from "@/lib/booking-rules";
+import { PercentRing } from "./percent-ring";
+import { VenueListDrawer } from "./venue-list-drawer";
 
 const PENDING_STATUSES = ["menunggu_kelulusan_pic", "menunggu_kelulusan_hq"] as const;
 const ACTIVE_UPCOMING_STATUSES = [
@@ -124,6 +126,26 @@ export default async function AsetHubPage() {
   const facilityById = new Map(facilityRows.map((f) => [f.id, f]));
   const maintenanceFacilities = facilityRows.filter((f) => f.status === "maintenance");
 
+  const openAduan = facilityIds.length
+    ? await db
+        .select({ kategori: aduanKerosakan.kategori, keterukan: aduanKerosakan.keterukan })
+        .from(aduanKerosakan)
+        .where(
+          and(
+            inArray(aduanKerosakan.facilityId, facilityIds),
+            inArray(aduanKerosakan.status, ["dilaporkan", "dalam_tindakan"]),
+          ),
+        )
+    : [];
+  const aduanCountByKategori = new Map<string, number>();
+  for (const a of openAduan) {
+    aduanCountByKategori.set(a.kategori, (aduanCountByKategori.get(a.kategori) ?? 0) + 1);
+  }
+  const aduanCountByKeterukan = { kritikal: 0, major: 0, minor: 0 };
+  for (const a of openAduan) {
+    aduanCountByKeterukan[a.keterukan]++;
+  }
+
   const activityScopeIds = nasional
     ? null
     : [...scopedVenueIds!, ...facilityIds, ...pendingBookings.map((b) => b.id)];
@@ -155,8 +177,15 @@ export default async function AsetHubPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl italic">{ms.aset.dashboard.tajuk}</h1>
+        <h1 className="font-display font-bold text-2xl">{ms.aset.dashboard.tajuk}</h1>
         <div className="flex gap-2">
+          <VenueListDrawer
+            venues={venueRows.map((v) => ({
+              id: v.id,
+              nama: v.nama,
+              facilityCount: facilityRows.filter((f) => f.venueId === v.id).length,
+            }))}
+          />
           <Link href="/aset/premis" className="rounded border px-3 py-1.5 text-sm hover:bg-muted/50">
             {ms.aset.premis}
           </Link>
@@ -170,30 +199,34 @@ export default async function AsetHubPage() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">{ms.aset.dashboard.jumlahPremis}</p>
-            <p className="font-display text-2xl italic tabular-nums">{venueRows.length}</p>
+            <p className="font-display font-bold text-2xl tabular-nums">{venueRows.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <p className="text-sm text-muted-foreground">{ms.aset.dashboard.jumlahFasiliti}</p>
-            <p className="font-display text-2xl italic tabular-nums">{facilityRows.length}</p>
+            <p className="font-display font-bold text-2xl tabular-nums">{facilityRows.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">{ms.aset.dashboard.kadarPenggunaan}</p>
-            <p className="font-display text-2xl italic tabular-nums">
-              {facilityRows.length ? Math.round((facilitiesInUse / facilityRows.length) * 100) : 0}%
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {ms.aset.dashboard.kadarPenggunaanNota(facilitiesInUse, facilityRows.length)}
-            </p>
+            <div className="flex items-center gap-3">
+              <PercentRing
+                percent={facilityRows.length ? Math.round((facilitiesInUse / facilityRows.length) * 100) : 0}
+              />
+              <div>
+                <p className="text-sm text-muted-foreground">{ms.aset.dashboard.kadarPenggunaan}</p>
+                <p className="text-xs text-muted-foreground">
+                  {ms.aset.dashboard.kadarPenggunaanNota(facilitiesInUse, facilityRows.length)}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="font-display text-lg italic">{ms.aset.dashboard.tempahanMenungguKelulusan}</h2>
+        <h2 className="font-display font-bold text-lg">{ms.aset.dashboard.tempahanMenungguKelulusan}</h2>
         {pendingBookings.length === 0 ? (
           <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaMenungguKelulusan}</p>
         ) : (
@@ -233,7 +266,7 @@ export default async function AsetHubPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="font-display text-lg italic">{ms.aset.dashboard.statusPenyelenggaraan}</h2>
+        <h2 className="font-display font-bold text-lg">{ms.aset.dashboard.statusPenyelenggaraan}</h2>
         {maintenanceFacilities.length === 0 ? (
           <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaPenyelenggaraan}</p>
         ) : (
@@ -255,7 +288,35 @@ export default async function AsetHubPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="font-display text-lg italic">{ms.aset.dashboard.aktivitiTerkini}</h2>
+        <h2 className="font-display font-bold text-lg">{ms.aset.dashboard.aduanTajuk}</h2>
+        {openAduan.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaAduanTerbuka}</p>
+        ) : (
+          <div className="flex flex-wrap gap-4">
+            <div className="flex gap-2">
+              <Badge variant="rejected">
+                {ms.aset.aduan.keterukan.kritikal}: {aduanCountByKeterukan.kritikal}
+              </Badge>
+              <Badge variant="pending">
+                {ms.aset.aduan.keterukan.major}: {aduanCountByKeterukan.major}
+              </Badge>
+              <Badge variant="draft">
+                {ms.aset.aduan.keterukan.minor}: {aduanCountByKeterukan.minor}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Array.from(aduanCountByKategori.entries()).map(([kategori, count]) => (
+                <Badge key={kategori} variant="waitlisted">
+                  {ms.aset.aduan.kategori[kategori as keyof typeof ms.aset.aduan.kategori]}: {count}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="font-display font-bold text-lg">{ms.aset.dashboard.aktivitiTerkini}</h2>
         {recentActivity.length === 0 ? (
           <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaAktiviti}</p>
         ) : (

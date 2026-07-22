@@ -9,6 +9,9 @@ import {
   facilityStatusEnum,
   bookingStatusEnum,
   bookingTypeEnum,
+  aduanKategoriEnum,
+  aduanKeterukanEnum,
+  aduanStatusEnum,
 } from "./enums";
 
 // Sistem 1 — Pengurusan Aset & Premis. Skop Langkah 8 (Fasa 0): venues +
@@ -117,4 +120,28 @@ export const venueBookings = aset.table("venue_bookings", {
   escalatedAt: timestamp("escalated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Aduan kerosakan — berasingan penuh drpd facilities.status (bukan automasi
+// silang, keputusan pilot). pic_premis (skop premis sendiri) + hq_admin
+// (nasional) boleh hantar/tanda tindakan/selesai — disahkan di action layer
+// (can()), bukan di sini.
+export const aduanKerosakan = aset.table("aduan_kerosakan", {
+  id: uuid("id")
+    .primaryKey()
+    .$defaultFn(() => uuidv7()),
+  facilityId: uuid("facility_id")
+    .notNull()
+    .references(() => facilities.id),
+  kategori: aduanKategoriEnum("kategori").notNull(),
+  keterukan: aduanKeterukanEnum("keterukan").notNull(),
+  keterangan: text("keterangan").notNull(),
+  status: aduanStatusEnum("status").notNull().default("dilaporkan"),
+  dilaporkanOleh: uuid("dilaporkan_oleh")
+    .notNull()
+    .references(() => users.id),
+  dilaporkanPada: timestamp("dilaporkan_pada", { withTimezone: true }).notNull().defaultNow(),
+  tindakanOleh: uuid("tindakan_oleh").references(() => users.id),
+  tindakanPada: timestamp("tindakan_pada", { withTimezone: true }),
+  selesaiPada: timestamp("selesai_pada", { withTimezone: true }),
 });

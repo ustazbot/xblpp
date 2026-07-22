@@ -65,7 +65,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "-apple-system", "Segoe UI", "sans-serif"],
-        display: ["var(--font-display)", "Iowan Old Style", "Georgia", "serif"],
+        display: ["var(--font-display)", "-apple-system", "Segoe UI", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

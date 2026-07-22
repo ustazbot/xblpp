@@ -142,7 +142,7 @@ export function CreateUserForm({ roleList, negeriList, daerahList, venueList }: 
 
       {state.tempPassword && (
         <div className="max-w-lg rounded-md border border-status-pending-border bg-card p-4">
-          <p className="font-display text-lg italic">{ms.admin.pengguna.tempPasswordTajuk}</p>
+          <p className="font-display font-bold text-lg">{ms.admin.pengguna.tempPasswordTajuk}</p>
           <p className="mt-1 text-sm text-muted-foreground">{ms.admin.pengguna.tempPasswordAmaran}</p>
           <p className="mt-3 flex items-center justify-between rounded border bg-secondary px-3 py-2 font-mono text-sm">
             <span>

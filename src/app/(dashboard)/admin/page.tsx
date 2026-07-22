@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { isHqAdmin } from "@/lib/rbac";
 import { db } from "@/db";
-import { users, roles, userRoles, negeri, daerah } from "@/db/schema/core";
-import { venues } from "@/db/schema/aset";
+import { users, roles, userRoles } from "@/db/schema/core";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ms } from "@/constants/ms";
-import { CreateUserForm } from "./create-user-form";
 import { ResetPasswordButton } from "./reset-password-button";
 
 export default async function AdminPage() {
@@ -15,28 +15,18 @@ export default async function AdminPage() {
   if (!session?.user?.id) redirect("/login");
   if (!isHqAdmin(session.user.roles)) redirect("/");
 
-  const [userRows, roleRoleRows, negeriRows, daerahRows, venueRows] = await Promise.all([
-    db
-      .select({
-        id: users.id,
-        nama: users.nama,
-        email: users.email,
-        status: users.status,
-        roleNama: roles.nama,
-      })
-      .from(users)
-      .leftJoin(userRoles, eq(userRoles.userId, users.id))
-      .leftJoin(roles, eq(roles.id, userRoles.roleId))
-      .orderBy(users.nama),
-    db.select({ code: roles.code, nama: roles.nama }).from(roles).orderBy(roles.nama),
-    db.select({ id: negeri.id, nama: negeri.nama }).from(negeri).orderBy(negeri.nama),
-    db
-      .select({ id: daerah.id, nama: daerah.nama, negeriKod: negeri.kod })
-      .from(daerah)
-      .innerJoin(negeri, eq(daerah.negeriId, negeri.id))
-      .orderBy(daerah.nama),
-    db.select({ id: venues.id, nama: venues.nama }).from(venues).orderBy(venues.nama),
-  ]);
+  const userRows = await db
+    .select({
+      id: users.id,
+      nama: users.nama,
+      email: users.email,
+      status: users.status,
+      roleNama: roles.nama,
+    })
+    .from(users)
+    .leftJoin(userRoles, eq(userRoles.userId, users.id))
+    .leftJoin(roles, eq(roles.id, userRoles.roleId))
+    .orderBy(users.nama);
 
   // Satu pengguna boleh ada >1 baris user_roles — kumpul nama role per
   // pengguna di sini (JS), bukan array_agg SQL, sama pattern query lain
@@ -52,20 +42,15 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-display text-2xl italic">{ms.admin.pengguna.tajuk}</h1>
-
-      <div className="flex flex-col gap-3">
-        <h2 className="font-display text-lg italic">{ms.admin.pengguna.ciptaPengguna}</h2>
-        <CreateUserForm
-          roleList={roleRoleRows.map((r) => ({ code: r.code, label: r.nama }))}
-          negeriList={negeriRows.map((n) => ({ id: n.id, label: n.nama }))}
-          daerahList={daerahRows.map((d) => ({ id: d.id, label: `${d.nama} (${d.negeriKod})` }))}
-          venueList={venueRows.map((v) => ({ id: v.id, label: v.nama }))}
-        />
+      <div className="flex items-center justify-between">
+        <h1 className="font-display font-bold text-2xl">{ms.admin.pengguna.tajuk}</h1>
+        <Button asChild>
+          <Link href="/admin/pengguna/baharu">+ {ms.admin.pengguna.ciptaPengguna}</Link>
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="font-display text-lg italic">{ms.admin.pengguna.senarai}</h2>
+        <h2 className="font-display font-bold text-lg">{ms.admin.pengguna.senarai}</h2>
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
