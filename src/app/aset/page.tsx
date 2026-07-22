@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { venues, facilities, venueBookings } from "@/db/schema/aset";
 import { users, auditLogs } from "@/db/schema/core";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { ms } from "@/constants/ms";
 import { daysUntil } from "@/lib/booking-rules";
 
@@ -154,7 +155,7 @@ export default async function AsetHubPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{ms.aset.dashboard.tajuk}</h1>
+        <h1 className="font-display text-2xl italic">{ms.aset.dashboard.tajuk}</h1>
         <div className="flex gap-2">
           <Link href="/aset/premis" className="rounded border px-3 py-1.5 text-sm hover:bg-muted/50">
             {ms.aset.premis}
@@ -166,27 +167,33 @@ export default async function AsetHubPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-md border p-4">
-          <p className="text-sm text-muted-foreground">{ms.aset.dashboard.jumlahPremis}</p>
-          <p className="text-2xl font-semibold">{venueRows.length}</p>
-        </div>
-        <div className="rounded-md border p-4">
-          <p className="text-sm text-muted-foreground">{ms.aset.dashboard.jumlahFasiliti}</p>
-          <p className="text-2xl font-semibold">{facilityRows.length}</p>
-        </div>
-        <div className="rounded-md border p-4">
-          <p className="text-sm text-muted-foreground">{ms.aset.dashboard.kadarPenggunaan}</p>
-          <p className="text-2xl font-semibold">
-            {facilityRows.length ? Math.round((facilitiesInUse / facilityRows.length) * 100) : 0}%
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {ms.aset.dashboard.kadarPenggunaanNota(facilitiesInUse, facilityRows.length)}
-          </p>
-        </div>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">{ms.aset.dashboard.jumlahPremis}</p>
+            <p className="font-display text-2xl italic tabular-nums">{venueRows.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">{ms.aset.dashboard.jumlahFasiliti}</p>
+            <p className="font-display text-2xl italic tabular-nums">{facilityRows.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">{ms.aset.dashboard.kadarPenggunaan}</p>
+            <p className="font-display text-2xl italic tabular-nums">
+              {facilityRows.length ? Math.round((facilitiesInUse / facilityRows.length) * 100) : 0}%
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {ms.aset.dashboard.kadarPenggunaanNota(facilitiesInUse, facilityRows.length)}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{ms.aset.dashboard.tempahanMenungguKelulusan}</h2>
+        <h2 className="font-display text-lg italic">{ms.aset.dashboard.tempahanMenungguKelulusan}</h2>
         {pendingBookings.length === 0 ? (
           <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaMenungguKelulusan}</p>
         ) : (
@@ -212,7 +219,7 @@ export default async function AsetHubPage() {
                     <td className="p-3">{b.tujuan}</td>
                     <td className="p-3">{b.requesterNama ?? "—"}</td>
                     <td className="p-3">
-                      <Badge variant="secondary">{ms.tempahan.status[b.status]}</Badge>
+                      <Badge variant="pending">{ms.tempahan.status[b.status]}</Badge>
                     </td>
                     <td className="p-3">
                       <SlaBadge slaDeadline={b.slaDeadline} now={now} />
@@ -226,14 +233,14 @@ export default async function AsetHubPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{ms.aset.dashboard.statusPenyelenggaraan}</h2>
+        <h2 className="font-display text-lg italic">{ms.aset.dashboard.statusPenyelenggaraan}</h2>
         {maintenanceFacilities.length === 0 ? (
           <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaPenyelenggaraan}</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {maintenanceFacilities.map((f) => (
               <li key={f.id} className="flex items-center gap-2 rounded-md border p-3 text-sm">
-                <Badge variant="secondary">{ms.aset.statusFasiliti.maintenance}</Badge>
+                <Badge variant="waitlisted">{ms.aset.statusFasiliti.maintenance}</Badge>
                 <span className="font-medium">{f.nama}</span>
                 <span className="text-muted-foreground">— {f.venueNama}</span>
                 {f.maintenanceUntil && (
@@ -248,7 +255,7 @@ export default async function AsetHubPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{ms.aset.dashboard.aktivitiTerkini}</h2>
+        <h2 className="font-display text-lg italic">{ms.aset.dashboard.aktivitiTerkini}</h2>
         {recentActivity.length === 0 ? (
           <p className="text-sm text-muted-foreground">{ms.aset.dashboard.tiadaAktiviti}</p>
         ) : (

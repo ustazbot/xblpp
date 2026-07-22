@@ -4,26 +4,46 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    /* BLPP design system ("Institutional Editorial") — 3 hue tetap: navy,
+       coral-red, warm-white. Nilai HSL ditukar drpd hex asal (rujuk
+       docs/BLPP Design System for KEMAS.zip/tokens/colors.css) — anggaran
+       blend sRGB linear, bukan oklch tepat, cukup hampir untuk token UI. */
+    --background: 45 33% 95%; /* warm white F7F5EF */
+    --foreground: 221 49% 15%; /* navy-800 */
+    --card: 0 0% 100%; /* putih tulen — sedikit lebih terang drpd page bg, tiada shadow */
+    --card-foreground: 221 49% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 224 71% 4%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 224 71% 4%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
-    --accent-foreground: 224 71% 4%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 224 71% 4%;
-    --radius: 0.5rem;
+    --popover-foreground: 221 49% 15%;
+    --primary: 221 49% 15%; /* navy-800 */
+    --primary-foreground: 45 33% 95%;
+    --secondary: 50 15% 92%; /* navy-50 */
+    --secondary-foreground: 221 49% 15%;
+    --muted: 50 15% 92%; /* navy-50 */
+    --muted-foreground: 219 8% 56%; /* navy-400 */
+    --accent: 50 15% 92%;
+    --accent-foreground: 221 49% 15%;
+    --destructive: 8 100% 64%; /* red-600 — satu-satunya guna coral accent */
+    --destructive-foreground: 45 33% 95%;
+    --border: 60 2% 84%; /* hairline navy ~14% atas bg, bukan shadow */
+    --input: 60 2% 84%;
+    --ring: 221 48% 17%; /* navy-700 */
+    --radius: 0.375rem; /* 6px — skala lg/md/sm shadcn (radius/-2px/-4px) jadi 6/4/2px, padan tepat spec */
+
+    /* Status badge (5 keadaan kelulusan) — dibezakan ikut fill/border,
+       BUKAN hue baharu (kekang 3 hue). Rujuk tokens/colors.css asal. */
+    --status-draft-fg: 219 8% 56%; /* navy-400 */
+    --status-draft-border: 210 2% 80%; /* navy-200 */
+    --status-pending-fg: 221 48% 17%; /* navy-700 */
+    --status-pending-border: 213 6% 68%; /* navy-300 */
+    --status-approved-fg: 45 33% 95%;
+    --status-approved-border: 221 49% 15%; /* navy-800 */
+    --status-approved-bg: 221 49% 15%;
+    --status-rejected-fg: 45 33% 95%;
+    --status-rejected-border: 8 69% 55%; /* red-700 */
+    --status-rejected-bg: 8 100% 64%; /* red-600 */
+    --status-waitlisted-fg: 220 22% 29%; /* navy-600 */
+    --status-waitlisted-border: 213 6% 68%; /* navy-300 */
+    --status-waitlisted-bg: 50 15% 92%; /* navy-50 */
   }
   .dark {
     --background: 224 71% 4%;

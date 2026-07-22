@@ -15,6 +15,16 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        // Status kelulusan (5 keadaan) — dibezakan ikut fill/border, bukan
+        // hue baharu (rujuk design system BLPP, kekang 3 hue tetap).
+        draft: "border-status-draft-border bg-transparent text-status-draft-fg",
+        pending: "border-status-pending-border bg-card text-status-pending-fg",
+        approved:
+          "border-status-approved-border bg-status-approved-bg text-status-approved-fg",
+        rejected:
+          "border-status-rejected-border bg-status-rejected-bg text-status-rejected-fg",
+        waitlisted:
+          "border-status-waitlisted-border bg-status-waitlisted-bg text-status-waitlisted-fg",
       },
     },
     defaultVariants: {

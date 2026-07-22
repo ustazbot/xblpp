@@ -43,6 +43,29 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        status: {
+          draft: { fg: "hsl(var(--status-draft-fg))", border: "hsl(var(--status-draft-border))" },
+          pending: { fg: "hsl(var(--status-pending-fg))", border: "hsl(var(--status-pending-border))" },
+          approved: {
+            fg: "hsl(var(--status-approved-fg))",
+            border: "hsl(var(--status-approved-border))",
+            bg: "hsl(var(--status-approved-bg))",
+          },
+          rejected: {
+            fg: "hsl(var(--status-rejected-fg))",
+            border: "hsl(var(--status-rejected-border))",
+            bg: "hsl(var(--status-rejected-bg))",
+          },
+          waitlisted: {
+            fg: "hsl(var(--status-waitlisted-fg))",
+            border: "hsl(var(--status-waitlisted-border))",
+            bg: "hsl(var(--status-waitlisted-bg))",
+          },
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "-apple-system", "Segoe UI", "sans-serif"],
+        display: ["var(--font-display)", "Iowan Old Style", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
