@@ -252,3 +252,43 @@ realiti DB.
    di atas tak bergantung padanya).
 2. Selepas repo jadi private: clone HTTPS awam dalam workflow akan gagal, perlu
    tukar ke SSH + deploy key (nota di atas).
+
+## Domain baharu blppkemas.com — draf Caddy (BELUM diapply, manual)
+
+Subdomain routing (`aset.`/`lms.`/apex/`staging-aset.`/`staging-lms.`) kini
+dikendalikan oleh `middleware.ts` + `src/lib/host.ts` — app sama, container
+sama, network `gerakops_net` sama. `blpp.gerakops.com` (fail
+`xblpp-{prod,staging}.caddy` sedia ada) **TAK disentuh**.
+
+**Fail baharu** — jangan gabung dgn `xblpp-{prod,staging}.caddy` sedia ada,
+supaya boleh padam/rollback berasingan tanpa jejas domain lama:
+
+```
+# /opt/gerakops/caddy/sites/xblpp-blppkemas.caddy
+aset.blppkemas.com, lms.blppkemas.com, blppkemas.com {
+    reverse_proxy nextjs_xblpp_prod:3000
+}
+staging-aset.blppkemas.com, staging-lms.blppkemas.com {
+    reverse_proxy nextjs_xblpp_staging:3000
+}
+```
+
+**Langkah manual (saya tak jalankan ni sendiri):**
+
+1. DNS di Shinjiru — 5 A record (`aset`, `lms`, `@`/apex, `staging-aset`,
+   `staging-lms`) → `212.47.72.248`.
+2. `.env` prod (`/opt/xblpp/clients/prod/.env`): tambah
+   `ROOT_DOMAIN=blppkemas.com` + `COOKIE_DOMAIN=.blppkemas.com`.
+3. `.env` staging: sama dua baris (root domain tetap `blppkemas.com`,
+   prefix `staging-` datang dari hostname sendiri, bukan env berasingan).
+4. Simpan draf di atas sebagai
+   `/opt/gerakops/caddy/sites/xblpp-blppkemas.caddy` di VPS.
+5. Reload Caddy: `docker exec gerakops_caddy caddy reload --config /etc/caddy/Caddyfile`
+   (sahkan path config sebenar dulu — ikut cara `xblpp-{prod,staging}.caddy`
+   sedia ada di-load, jangan andaikan).
+6. `docker compose up -d --force-recreate app` kedua-dua environment supaya
+   `ROOT_DOMAIN`/`COOKIE_DOMAIN` termuat.
+7. Uji staging dulu (dua-dua domain lama & baharu hidup serentak) sebelum
+   ulang kat prod — rujuk senarai ujian manual dalam EXECUTION PLAN Task 1.
+8. **JANGAN** padam/redirect `blpp.gerakops.com` sehingga semua subdomain
+   baharu disahkan stabil.

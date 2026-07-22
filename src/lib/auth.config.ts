@@ -19,6 +19,11 @@ export const authConfig = {
         httpOnly: true,
         sameSite: "strict",
         secure: process.env.NODE_ENV === "production",
+        // Kosong (host-only) untuk domain lama/dev — TIADA domain di sini
+        // sebab browser tolak cookie kalau domain attribute tak match host
+        // sebenar. Isi ".blppkemas.com" hanya pada .env domain baharu supaya
+        // session dikongsi merentas aset./lms. (rujuk EXECUTION PLAN Task 1).
+        ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
       },
     },
   },

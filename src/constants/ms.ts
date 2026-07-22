@@ -225,6 +225,13 @@ export const ms = {
     kuiz: "Kuiz",
     portal: "Portal Saya",
   },
+  apex: {
+    tajuk: "Sistem Pengurusan BLPP KEMAS",
+    keterangan:
+      "Pilih sistem untuk diteruskan.",
+    butangAset: "Aset & Premis",
+    butangLatihan: "Latihan",
+  },
   ralat: {
     umum: "Ralat berlaku. Sila cuba semula.",
     tiadaAkses: "Anda tiada akses ke halaman ini.",
